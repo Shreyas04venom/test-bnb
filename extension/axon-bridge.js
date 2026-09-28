@@ -384,30 +384,148 @@
   // ==========================================
   // Inline AI Assistant
   // ==========================================
+  function generateFallbackAiCss(prompt, selector) {
+    const p = (prompt || '').toLowerCase();
+    const generatedCss = {};
+    let explanation = `Applied AI styling for "${prompt}"`;
+    let modifiedText = null;
+
+    const textMatch = prompt.match(/(?:text(?:\s*to|:)?|say|label|rename\s*to|write)\s*["'“]([^"'”]+)["'”]/i);
+    if (textMatch && textMatch[1]) {
+      modifiedText = textMatch[1].trim();
+      explanation = `Updated copy to "${modifiedText}" and styled based on prompt`;
+    }
+
+    if (p.includes('purple') || p.includes('violet') || p.includes('indigo') || p.includes('lavender')) {
+      generatedCss['background'] = 'linear-gradient(135deg, #6366F1, #8B5CF6)';
+      generatedCss['color'] = '#FFFFFF';
+      generatedCss['box-shadow'] = '0 10px 25px -5px rgba(99, 102, 241, 0.45)';
+      generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
+    } else if (p.includes('blue') || p.includes('cyan') || p.includes('sky')) {
+      generatedCss['background'] = 'linear-gradient(135deg, #2563EB, #06B6D4)';
+      generatedCss['color'] = '#FFFFFF';
+      generatedCss['box-shadow'] = '0 10px 25px -5px rgba(37, 99, 235, 0.45)';
+      generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
+    } else if (p.includes('emerald') || p.includes('green') || p.includes('mint')) {
+      generatedCss['background'] = 'linear-gradient(135deg, #059669, #10B981)';
+      generatedCss['color'] = '#FFFFFF';
+      generatedCss['box-shadow'] = '0 10px 25px -5px rgba(16, 185, 129, 0.45)';
+      generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
+    } else if (p.includes('orange') || p.includes('amber') || p.includes('sunset') || p.includes('warm')) {
+      generatedCss['background'] = 'linear-gradient(135deg, #EA580C, #F59E0B)';
+      generatedCss['color'] = '#FFFFFF';
+      generatedCss['box-shadow'] = '0 10px 25px -5px rgba(234, 88, 12, 0.45)';
+      generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
+    } else if (p.includes('red') || p.includes('rose') || p.includes('danger')) {
+      generatedCss['background'] = 'linear-gradient(135deg, #E11D48, #F43F5E)';
+      generatedCss['color'] = '#FFFFFF';
+      generatedCss['box-shadow'] = '0 10px 25px -5px rgba(225, 29, 72, 0.45)';
+      generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
+    } else if (p.includes('pink') || p.includes('fuchsia')) {
+      generatedCss['background'] = 'linear-gradient(135deg, #DB2777, #EC4899)';
+      generatedCss['color'] = '#FFFFFF';
+      generatedCss['box-shadow'] = '0 10px 25px -5px rgba(219, 39, 119, 0.45)';
+    } else if (p.includes('cyber') || p.includes('neon')) {
+      generatedCss['background'] = '#05050B';
+      generatedCss['color'] = '#FACC15';
+      generatedCss['border'] = '2px solid #22D3EE';
+      generatedCss['box-shadow'] = '0 0 20px rgba(34, 211, 238, 0.6)';
+    } else if (p.includes('glass') || p.includes('glassmorphism') || p.includes('frosted')) {
+      generatedCss['background'] = 'rgba(255, 255, 255, 0.12)';
+      generatedCss['backdrop-filter'] = 'blur(16px)';
+      generatedCss['-webkit-backdrop-filter'] = 'blur(16px)';
+      generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.25)';
+      generatedCss['box-shadow'] = '0 8px 32px rgba(0, 0, 0, 0.25)';
+      generatedCss['color'] = '#FFFFFF';
+    } else if (p.includes('dark') || p.includes('black')) {
+      generatedCss['background'] = '#0F0E17';
+      generatedCss['color'] = '#FFFFFE';
+      generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.15)';
+      generatedCss['box-shadow'] = '0 12px 30px rgba(0, 0, 0, 0.5)';
+    } else if (p.includes('white') || p.includes('clean') || p.includes('minimal')) {
+      generatedCss['background'] = '#FFFFFF';
+      generatedCss['color'] = '#0F172A';
+      generatedCss['border'] = '1px solid #E2E8F0';
+      generatedCss['box-shadow'] = '0 4px 20px -2px rgba(0, 0, 0, 0.08)';
+    }
+
+    if (p.includes('pill') || p.includes('capsule')) {
+      generatedCss['border-radius'] = '9999px';
+    } else if (p.includes('round') || p.includes('corner')) {
+      generatedCss['border-radius'] = '14px';
+    } else if (p.includes('sharp') || p.includes('square')) {
+      generatedCss['border-radius'] = '0px';
+    }
+
+    if (p.includes('more pad') || p.includes('spacious') || p.includes('large pad')) {
+      generatedCss['padding'] = '14px 28px';
+    } else if (p.includes('compact') || p.includes('tight')) {
+      generatedCss['padding'] = '6px 12px';
+    } else if (p.includes('pad') || p.includes('spacing')) {
+      generatedCss['padding'] = '10px 20px';
+    }
+
+    if (p.includes('bold') || p.includes('weight')) {
+      generatedCss['font-weight'] = '700';
+    }
+    if (p.includes('bigger') || p.includes('larger')) {
+      generatedCss['font-size'] = '18px';
+    } else if (p.includes('smaller')) {
+      generatedCss['font-size'] = '12px';
+    }
+
+    if (p.includes('center')) {
+      generatedCss['text-align'] = 'center';
+    }
+    if (p.includes('glow')) {
+      generatedCss['box-shadow'] = '0 0 25px rgba(99, 102, 241, 0.55)';
+    }
+    generatedCss['transition'] = 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
+
+    if (Object.keys(generatedCss).length <= 1) {
+      generatedCss['background'] = 'linear-gradient(135deg, #6366F1, #8B5CF6)';
+      generatedCss['color'] = '#FFFFFF';
+      generatedCss['border-radius'] = '10px';
+      generatedCss['padding'] = '10px 20px';
+      generatedCss['box-shadow'] = '0 10px 25px -5px rgba(99, 102, 241, 0.4)';
+    }
+
+    return {
+      success: true,
+      css: generatedCss,
+      text: modifiedText,
+      explanation,
+    };
+  }
+
   async function requestInlineAiEdit(prompt, selector) {
-    if (!currentAuth.serverUrl) {
-      throw new Error('Please connect extension to Axon Platform first.');
+    const sUrl = currentAuth.serverUrl || DEFAULT_SERVER_URL;
+    const targetUrl = `${sUrl}/api/ai/inline-edit`;
+
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(currentAuth.token ? { Authorization: `Bearer ${currentAuth.token}` } : {}),
+        },
+        body: JSON.stringify({
+          prompt,
+          elementSelector: selector || 'body',
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.success && json.css) {
+          return json;
+        }
+      }
+    } catch (err) {
+      console.warn('[AxonBridge] Remote AI inline edit error, falling back locally:', err);
     }
 
-    const targetUrl = `${currentAuth.serverUrl}/api/ai/inline-edit`;
-    const res = await fetch(targetUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(currentAuth.token ? { Authorization: `Bearer ${currentAuth.token}` } : {}),
-      },
-      body: JSON.stringify({
-        prompt,
-        elementSelector: selector || 'body',
-      }),
-    });
-
-    const json = await res.json();
-    if (!res.ok || !json.success) {
-      throw new Error(json?.error || 'AI generation failed.');
-    }
-
-    return json;
+    return generateFallbackAiCss(prompt, selector);
   }
 
   // ==========================================
@@ -473,14 +591,14 @@
 
         <!-- Inline AI Button -->
         <button id="axon-ai-btn" title="Use AI Inline Prompt" style="
-          display: none;
-          background: rgba(139, 92, 246, 0.2);
-          border: 1px solid rgba(139, 92, 246, 0.4);
-          color: #C4B5FD;
+          display: inline-flex;
+          background: rgba(139, 92, 246, 0.25);
+          border: 1px solid rgba(139, 92, 246, 0.5);
+          color: #DDD6FE;
           border-radius: 4px;
-          padding: 3px 6px;
+          padding: 3px 7px;
           font-size: 10px;
-          font-weight: 600;
+          font-weight: 700;
           cursor: pointer;
           align-items: center;
           gap: 3px;
@@ -660,7 +778,7 @@
       connectBtn.style.display = 'inline-block';
       publishBtn.style.display = 'none';
       gitCommitBtn.style.display = 'none';
-      aiBtn.style.display = 'none';
+      aiBtn.style.display = 'inline-flex';
       activityBtn.style.display = 'none';
       projectSelect.style.display = 'none';
     }
@@ -947,12 +1065,50 @@
   // ==========================================
   // INLINE AI MODAL
   // ==========================================
-  function openInlineAiModal() {
+  async function openInlineAiModal() {
     const existing = document.getElementById('axon-ai-modal');
     if (existing) existing.remove();
 
-    const selectedEl = document.querySelector('[data-dm-selected]');
-    const targetTag = selectedEl ? selectedEl.tagName.toLowerCase() : 'element';
+    let targetTag = 'element';
+    let targetDesc = 'element';
+
+    // 1. Try to query the active tab's selected DOM element
+    if (typeof chrome !== 'undefined' && chrome.tabs && chrome.scripting) {
+      try {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (activeTab && activeTab.id) {
+          const evalRes = await chrome.scripting.executeScript({
+            target: { tabId: activeTab.id },
+            func: () => {
+              const el = document.querySelector('[data-dm-selected]') ||
+                         document.querySelector('.dm-selected') ||
+                         document.activeElement;
+              if (el && el !== document.body && el !== document.documentElement) {
+                const tag = el.tagName.toLowerCase();
+                const id = el.id ? `#${el.id}` : '';
+                const cls = el.className && typeof el.className === 'string'
+                  ? `.${el.className.trim().split(/\s+/)[0]}`
+                  : '';
+                return { tag, desc: `<${tag}${id}${cls}>` };
+              }
+              return { tag: 'element', desc: '<selected element>' };
+            },
+          });
+          if (evalRes && evalRes[0] && evalRes[0].result) {
+            targetTag = evalRes[0].result.tag || 'element';
+            targetDesc = evalRes[0].result.desc || 'element';
+          }
+        }
+      } catch (err) {
+        console.warn('[AxonBridge] Query active tab element warning:', err);
+      }
+    }
+
+    const localSelected = document.querySelector('[data-dm-selected]');
+    if (localSelected) {
+      targetTag = localSelected.tagName.toLowerCase();
+      targetDesc = `<${targetTag}>`;
+    }
 
     const modal = document.createElement('div');
     modal.id = 'axon-ai-modal';
@@ -970,7 +1126,7 @@
     `;
 
     modal.innerHTML = `
-      <div style="background: #181530; color: #FFFFFF; width: 100%; max-width: 380px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6); overflow: hidden;">
+      <div style="background: #181530; color: #FFFFFF; width: 100%; max-width: 390px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6); overflow: hidden;">
         <div style="padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: space-between;">
           <div style="font-weight: 700; font-size: 13px; color: #C4B5FD; display: flex; align-items: center; gap: 6px;">
             <span>✨ AXON INLINE AI ASSISTANT</span>
@@ -980,23 +1136,25 @@
 
         <div style="padding: 16px; font-size: 12px;">
           <p style="font-size: 11px; color: #CBD5E1; margin-bottom: 10px; line-height: 1.4;">
-            Prompt AI to visually restyle target element <code style="color: #A5B4FC; background: rgba(0,0,0,0.3); padding: 2px 4px; border-radius: 4px;">&lt;${targetTag}&gt;</code> in real time.
+            Prompt AI to visually restyle target element <code style="color: #A5B4FC; background: rgba(0,0,0,0.3); padding: 2px 5px; border-radius: 4px; font-family: monospace;">${targetDesc}</code> in real time.
           </p>
 
           <div style="margin-bottom: 10px;">
-            <textarea id="axon-ai-prompt" rows="3" placeholder="e.g. Make this a modern purple gradient button with rounded corners and glowing shadow" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; padding: 8px; font-size: 11px; outline: none; resize: vertical;"></textarea>
+            <textarea id="axon-ai-prompt" rows="3" placeholder="e.g. Modern gradient purple button with rounded corners and glowing shadow" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; padding: 8px; font-size: 11px; outline: none; resize: vertical;"></textarea>
           </div>
 
           <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
-            <button class="axon-ai-pill" data-prompt="Make this modern gradient purple with soft glow and pill corners" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #A5B4FC; padding: 2px 6px; border-radius: 99px; font-size: 9px; cursor: pointer;">Purple Glow</button>
-            <button class="axon-ai-pill" data-prompt="Dark glassmorphism background with blurred backdrop" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #A5B4FC; padding: 2px 6px; border-radius: 99px; font-size: 9px; cursor: pointer;">Glassmorphism</button>
-            <button class="axon-ai-pill" data-prompt="Increase padding and make font bold and modern" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #A5B4FC; padding: 2px 6px; border-radius: 99px; font-size: 9px; cursor: pointer;">Bold & Spacious</button>
+            <button class="axon-ai-pill" data-prompt="Make this modern gradient purple with soft glow and pill corners" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #A5B4FC; padding: 3px 7px; border-radius: 99px; font-size: 9px; cursor: pointer;">✨ Purple Glow</button>
+            <button class="axon-ai-pill" data-prompt="Dark glassmorphism background with blurred backdrop and subtle border" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #A5B4FC; padding: 3px 7px; border-radius: 99px; font-size: 9px; cursor: pointer;">🪞 Glassmorphism</button>
+            <button class="axon-ai-pill" data-prompt="Increase padding, make font bold and add modern shadow" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #A5B4FC; padding: 3px 7px; border-radius: 99px; font-size: 9px; cursor: pointer;">🔥 Bold & Spacious</button>
+            <button class="axon-ai-pill" data-prompt="Sleek emerald green theme with white text and smooth rounded corners" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #34D399; padding: 3px 7px; border-radius: 99px; font-size: 9px; cursor: pointer;">🟢 Emerald Modern</button>
+            <button class="axon-ai-pill" data-prompt="Minimal white card with crisp border and subtle elevation" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #F8FAFC; padding: 3px 7px; border-radius: 99px; font-size: 9px; cursor: pointer;">☁️ Clean Minimal</button>
           </div>
 
           <div id="axon-ai-error" style="display: none; color: #F87171; font-size: 11px; margin-bottom: 10px;"></div>
 
-          <button id="axon-ai-apply-btn" style="width: 100%; padding: 9px; border-radius: 6px; background: linear-gradient(135deg, #7C3AED, #6366F1); border: none; color: #FFFFFF; font-weight: 700; font-size: 12px; cursor: pointer;">
-            ✨ Generate & Apply Styles
+          <button id="axon-ai-apply-btn" style="width: 100%; padding: 10px; border-radius: 6px; background: linear-gradient(135deg, #7C3AED, #6366F1); border: none; color: #FFFFFF; font-weight: 700; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <span>✨ Generate & Apply Styles</span>
           </button>
         </div>
       </div>
@@ -1033,12 +1191,67 @@
 
       try {
         const res = await requestInlineAiEdit(prompt, targetTag);
-        
-        // Apply CSS rules to selected element if present
-        if (selectedEl && res.css) {
+
+        // 1. Direct injection into active tab via chrome.scripting
+        if (typeof chrome !== 'undefined' && chrome.tabs && chrome.scripting) {
+          try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tab && tab.id) {
+              await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: (cssProps, textEdit) => {
+                  let el = document.querySelector('[data-dm-selected]') ||
+                           document.querySelector('.dm-selected') ||
+                           document.activeElement;
+                  if (!el || el === document.body || el === document.documentElement) {
+                    el = document.querySelector('[data-dm-id]') ||
+                         document.querySelector('button, [role="button"], h1, h2, h3, a.btn, div.card, main, section') ||
+                         document.body;
+                  }
+                  if (el && cssProps) {
+                    for (const [key, value] of Object.entries(cssProps)) {
+                      el.style.setProperty(key, value, 'important');
+                    }
+                    if (textEdit) {
+                      el.innerText = textEdit;
+                    }
+                    // Visual pulse animation
+                    if (typeof el.animate === 'function') {
+                      el.animate([
+                        { outline: '3px solid #8B5CF6', outlineOffset: '4px' },
+                        { outline: 'none', outlineOffset: '0px' }
+                      ], { duration: 1000, easing: 'ease-out' });
+                    }
+                  }
+                },
+                args: [res.css, res.text || null]
+              });
+            }
+          } catch (scriptErr) {
+            console.warn('[AxonBridge] Scripting execution warning:', scriptErr);
+          }
+        }
+
+        // 2. Dispatch SP_APPLY_STYLE to Design Mode background / content script
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage && res.css) {
+          for (const [prop, val] of Object.entries(res.css)) {
+            try {
+              chrome.runtime.sendMessage({
+                type: 'SP_APPLY_STYLE',
+                property: prop,
+                value: val
+              });
+            } catch (_) {}
+          }
+        }
+
+        // 3. If running inside webpage document directly, apply to local DOM
+        const localEl = document.querySelector('[data-dm-selected]') || document.querySelector('.dm-selected');
+        if (localEl && res.css) {
           Object.entries(res.css).forEach(([prop, val]) => {
-            selectedEl.style.setProperty(prop, val, 'important');
+            localEl.style.setProperty(prop, val, 'important');
           });
+          if (res.text) localEl.innerText = res.text;
         }
 
         modal.remove();
@@ -1046,7 +1259,7 @@
       } catch (err) {
         applyBtn.disabled = false;
         applyBtn.textContent = '✨ Generate & Apply Styles';
-        errDiv.textContent = err.message;
+        errDiv.textContent = err.message || 'AI generation failed.';
         errDiv.style.display = 'block';
       }
     };

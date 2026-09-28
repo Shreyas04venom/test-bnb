@@ -943,12 +943,31 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
           });
           if (res.ok) {
             const json = await res.json();
-            if (json.session) {
+            const session = json.session || (json.accessToken ? {
+              id: json.accessToken,
+              userId: get().currentUser?.id || 'usr-1',
+              workspaceId: get().workspace.id,
+              deviceName,
+              browser: 'Chrome 129',
+              tokenHash: json.accessToken,
+              permissions: [
+                'read:projects',
+                'write:patches',
+                'read:collaborators',
+                'realtime:presence',
+                'audit:events',
+              ],
+              createdAt: new Date().toISOString(),
+              lastActiveAt: 'Just now',
+              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            } : null);
+
+            if (session) {
               set((state) => ({
-                extensionSessions: [json.session, ...state.extensionSessions],
+                extensionSessions: [session, ...state.extensionSessions],
                 pairingCode: null,
               }));
-              return json.session;
+              return session;
             }
           }
         } catch {

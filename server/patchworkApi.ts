@@ -1028,6 +1028,7 @@ patchworkApiRouter.post('/extension/session', (req: Request, res: Response) => {
 
   res.json({
     success: true,
+    session: newSession,
     accessToken: token,
     tokenType: 'Bearer',
     expiresInDays: 30,
@@ -1043,7 +1044,6 @@ patchworkApiRouter.post('/extension/session', (req: Request, res: Response) => {
       productionUrl: p.productionUrl,
       framework: p.framework,
     })),
-    session: newSession,
   });
 });
 
@@ -1451,63 +1451,141 @@ patchworkApiRouter.post('/ai/inline-edit', (req: Request, res: Response) => {
   let explanation = `Applied AI visual styling based on "${prompt}"`;
   let modifiedText: string | undefined = undefined;
 
-  if (p.includes('purple') || p.includes('violet') || p.includes('indigo')) {
+  // 1. Text content override detection (e.g. text: "Click Here" or say "Get Started")
+  const textMatch = prompt.match(/(?:text(?:\s*to|:)?|say|label|rename\s*to|write)\s*["'“]([^"'”]+)["'”]/i);
+  if (textMatch && textMatch[1]) {
+    modifiedText = textMatch[1].trim();
+    explanation = `Updated copy to "${modifiedText}" and applied styling based on prompt`;
+  }
+
+  // 2. Color Palettes & Themes
+  if (p.includes('purple') || p.includes('violet') || p.includes('indigo') || p.includes('lavender')) {
     generatedCss['background'] = 'linear-gradient(135deg, #6366F1, #8B5CF6)';
     generatedCss['color'] = '#FFFFFF';
-    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(99, 102, 241, 0.4)';
-  } else if (p.includes('blue') || p.includes('cyan')) {
+    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(99, 102, 241, 0.45)';
+    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
+  } else if (p.includes('blue') || p.includes('cyan') || p.includes('sky') || p.includes('ocean')) {
     generatedCss['background'] = 'linear-gradient(135deg, #2563EB, #06B6D4)';
     generatedCss['color'] = '#FFFFFF';
-    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(37, 99, 235, 0.4)';
-  } else if (p.includes('emerald') || p.includes('green')) {
+    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(37, 99, 235, 0.45)';
+    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
+  } else if (p.includes('emerald') || p.includes('green') || p.includes('mint') || p.includes('lime')) {
     generatedCss['background'] = 'linear-gradient(135deg, #059669, #10B981)';
     generatedCss['color'] = '#FFFFFF';
-    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(16, 185, 129, 0.4)';
-  } else if (p.includes('glass') || p.includes('glassmorphism')) {
+    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(16, 185, 129, 0.45)';
+    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
+  } else if (p.includes('orange') || p.includes('amber') || p.includes('sunset') || p.includes('warm') || p.includes('coral')) {
+    generatedCss['background'] = 'linear-gradient(135deg, #EA580C, #F59E0B)';
+    generatedCss['color'] = '#FFFFFF';
+    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(234, 88, 12, 0.45)';
+    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
+  } else if (p.includes('red') || p.includes('rose') || p.includes('crimson') || p.includes('danger') || p.includes('ruby')) {
+    generatedCss['background'] = 'linear-gradient(135deg, #E11D48, #F43F5E)';
+    generatedCss['color'] = '#FFFFFF';
+    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(225, 29, 72, 0.45)';
+    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
+  } else if (p.includes('pink') || p.includes('fuchsia') || p.includes('magenta')) {
+    generatedCss['background'] = 'linear-gradient(135deg, #DB2777, #EC4899)';
+    generatedCss['color'] = '#FFFFFF';
+    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(219, 39, 119, 0.45)';
+    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
+  } else if (p.includes('cyber') || p.includes('neon')) {
+    generatedCss['background'] = '#05050B';
+    generatedCss['color'] = '#FACC15';
+    generatedCss['border'] = '2px solid #22D3EE';
+    generatedCss['box-shadow'] = '0 0 20px rgba(34, 211, 238, 0.6), inset 0 0 10px rgba(34, 211, 238, 0.2)';
+    generatedCss['text-shadow'] = '0 0 8px rgba(250, 204, 21, 0.7)';
+  } else if (p.includes('glass') || p.includes('glassmorphism') || p.includes('frosted')) {
     generatedCss['background'] = 'rgba(255, 255, 255, 0.12)';
     generatedCss['backdrop-filter'] = 'blur(16px)';
-    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
-    generatedCss['box-shadow'] = '0 8px 32px rgba(0, 0, 0, 0.2)';
-  } else if (p.includes('dark') || p.includes('black')) {
+    generatedCss['-webkit-backdrop-filter'] = 'blur(16px)';
+    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.25)';
+    generatedCss['box-shadow'] = '0 8px 32px rgba(0, 0, 0, 0.25)';
+    generatedCss['color'] = '#FFFFFF';
+  } else if (p.includes('dark') || p.includes('black') || p.includes('midnight') || p.includes('charcoal')) {
     generatedCss['background'] = '#0F0E17';
     generatedCss['color'] = '#FFFFFE';
     generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.15)';
+    generatedCss['box-shadow'] = '0 12px 30px rgba(0, 0, 0, 0.5)';
+  } else if (p.includes('white') || p.includes('clean') || p.includes('minimal') || p.includes('light')) {
+    generatedCss['background'] = '#FFFFFF';
+    generatedCss['color'] = '#0F172A';
+    generatedCss['border'] = '1px solid #E2E8F0';
+    generatedCss['box-shadow'] = '0 4px 20px -2px rgba(0, 0, 0, 0.08)';
   }
 
-  if (p.includes('round') || p.includes('corner') || p.includes('pill')) {
-    generatedCss['border-radius'] = p.includes('pill') || p.includes('full') ? '9999px' : '12px';
+  // 3. Borders & Radius
+  if (p.includes('pill') || p.includes('capsule') || p.includes('full round')) {
+    generatedCss['border-radius'] = '9999px';
+  } else if (p.includes('round') || p.includes('corner') || p.includes('curved')) {
+    generatedCss['border-radius'] = '14px';
+  } else if (p.includes('sharp') || p.includes('square') || p.includes('no round')) {
+    generatedCss['border-radius'] = '0px';
   }
 
-  if (p.includes('pad') || p.includes('padding') || p.includes('spacing')) {
-    generatedCss['padding'] = '12px 24px';
+  // 4. Spacing & Padding
+  if (p.includes('more pad') || p.includes('spacious') || p.includes('generous') || p.includes('large pad')) {
+    generatedCss['padding'] = '14px 28px';
+  } else if (p.includes('compact') || p.includes('tight') || p.includes('small pad')) {
+    generatedCss['padding'] = '6px 12px';
+  } else if (p.includes('pad') || p.includes('spacing')) {
+    generatedCss['padding'] = '10px 20px';
   }
 
-  if (p.includes('shadow') || p.includes('glow')) {
-    generatedCss['box-shadow'] = generatedCss['box-shadow'] || '0 12px 28px rgba(0, 0, 0, 0.25)';
-  }
-
-  if (p.includes('bold') || p.includes('weight')) {
+  // 5. Typography
+  if (p.includes('bold') || p.includes('weight') || p.includes('strong')) {
     generatedCss['font-weight'] = '700';
+  } else if (p.includes('light font') || p.includes('thin')) {
+    generatedCss['font-weight'] = '300';
   }
 
-  if (p.includes('bigger') || p.includes('increase size') || p.includes('larger')) {
+  if (p.includes('bigger') || p.includes('larger') || p.includes('increase size') || p.includes('huge')) {
     generatedCss['font-size'] = '18px';
-  } else if (p.includes('smaller')) {
+  } else if (p.includes('smaller') || p.includes('tiny')) {
     generatedCss['font-size'] = '12px';
   }
 
   if (p.includes('center')) {
     generatedCss['text-align'] = 'center';
+  } else if (p.includes('left')) {
+    generatedCss['text-align'] = 'left';
+  } else if (p.includes('right')) {
+    generatedCss['text-align'] = 'right';
   }
 
-  if (p.includes('border') && !generatedCss['border']) {
-    generatedCss['border'] = '2px solid #6366F1';
+  if (p.includes('uppercase') || p.includes('all caps')) {
+    generatedCss['text-transform'] = 'uppercase';
+    generatedCss['letter-spacing'] = '0.06em';
   }
 
-  if (Object.keys(generatedCss).length === 0) {
-    generatedCss['box-shadow'] = '0 8px 24px rgba(99, 102, 241, 0.3)';
+  // 6. Shadows & Glows
+  if (p.includes('glow')) {
+    const existingShadow = generatedCss['box-shadow'];
+    generatedCss['box-shadow'] = existingShadow
+      ? `${existingShadow}, 0 0 20px rgba(139, 92, 246, 0.4)`
+      : '0 0 25px rgba(99, 102, 241, 0.55)';
+  } else if (p.includes('shadow') && !generatedCss['box-shadow']) {
+    generatedCss['box-shadow'] = '0 12px 28px rgba(0, 0, 0, 0.25)';
+  }
+
+  // 7. Interaction and Transitions
+  generatedCss['transition'] = 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
+  if (p.includes('button') || p.includes('clickable') || p.includes('pointer')) {
+    generatedCss['cursor'] = 'pointer';
+    if (!generatedCss['display']) generatedCss['display'] = 'inline-flex';
+    generatedCss['align-items'] = 'center';
+    generatedCss['justify-content'] = 'center';
+  }
+
+  // Default fallback if no specific rule matched
+  if (Object.keys(generatedCss).length <= 1) {
+    generatedCss['background'] = 'linear-gradient(135deg, #6366F1, #8B5CF6)';
+    generatedCss['color'] = '#FFFFFF';
     generatedCss['border-radius'] = '10px';
-    generatedCss['transition'] = 'all 0.2s ease';
+    generatedCss['padding'] = '10px 20px';
+    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(99, 102, 241, 0.4)';
+    generatedCss['font-weight'] = '600';
+    explanation = `Applied modern gradient styling and elevation for "${prompt}"`;
   }
 
   pushAudit('PATCH_UPDATED', {
