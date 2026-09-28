@@ -15,11 +15,11 @@ import {
 
 export default function AiSettingsPage() {
   const { integrations, updateIntegrations, logAudit } = usePatchworkStore();
-  const [provider, setProvider] = useState(integrations.ai.provider);
-  const [model, setModel] = useState(integrations.ai.model);
-  const [allowFrontend, setAllowFrontend] = useState(integrations.ai.allowFrontendModifications);
-  const [allowBackend, setAllowBackend] = useState(integrations.ai.allowBackendModifications);
-  const [requireHighRiskApproval, setRequireHighRiskApproval] = useState(integrations.ai.requireApprovalForHighRisk);
+  const [provider, setProvider] = useState(integrations?.ai?.provider || 'gemini');
+  const [model, setModel] = useState(integrations?.ai?.model || 'gemini-1.5-pro');
+  const [allowFrontend, setAllowFrontend] = useState(integrations?.ai?.allowFrontendModifications ?? true);
+  const [allowBackend, setAllowBackend] = useState(integrations?.ai?.allowBackendModifications ?? false);
+  const [requireHighRiskApproval, setRequireHighRiskApproval] = useState(integrations?.ai?.requireApprovalForHighRisk ?? true);
   const [saved, setSaved] = useState(false);
 
   const handleSave = (e: React.FormEvent) => {

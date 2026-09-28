@@ -23,9 +23,14 @@ export default function ExtensionSettingsPage() {
     pairingCode,
     generatePairingCode,
     revokeExtensionSession,
-    logAudit
+    logAudit,
+    integrations,
   } = usePatchworkStore();
   const [copied, setCopied] = useState(false);
+
+  const areIntegrationsReady = Boolean(
+    integrations?.github?.connected && integrations?.vercel?.connected
+  );
 
   const handleCopyCode = () => {
     if (pairingCode) {
@@ -40,62 +45,97 @@ export default function ExtensionSettingsPage() {
       title="Chrome Extension Settings"
       subtitle="Pair and manage visual browser editor clients connected to this workspace."
       actions={
-        <Link
-          href="/extension/connect"
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold shadow-xs hover:bg-black transition-all"
-        >
-          <Key className="w-3.5 h-3.5" />
-          <span>Generate Pairing Token</span>
-        </Link>
+        areIntegrationsReady ? (
+          <Link
+            href="/extension/connect"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold shadow-xs hover:bg-black transition-all"
+          >
+            <Key className="w-3.5 h-3.5" />
+            <span>Generate Pairing Token</span>
+          </Link>
+        ) : (
+          <Link
+            href="/settings/integrations"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500 text-white text-xs font-semibold shadow-xs hover:bg-amber-600 transition-all"
+          >
+            <span>Setup Integrations First</span>
+          </Link>
+        )
       }
     >
       <div className="space-y-6 max-w-4xl">
         <SettingsNav currentTab="chrome extension" />
 
         {/* Pairing Code Card */}
-        <div className="glass-card p-6 md:p-8 border border-white/80 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-black/5">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
-                <ChromeIcon size={24} />
+        {areIntegrationsReady ? (
+          <div className="glass-card p-6 md:p-8 border border-white/80 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-black/5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                  <ChromeIcon size={24} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-[#1B133C]">One-Click Pairing Code</h3>
+                  <p className="text-xs text-muted-foreground">Enter this 6-digit pin in the AXON Chrome extension popup.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-base text-[#1B133C]">One-Click Pairing Code</h3>
-                <p className="text-xs text-muted-foreground">Enter this 6-digit pin in the PATCHWORK Chrome extension popup.</p>
-              </div>
+
+              <button
+                onClick={() => generatePairingCode()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/10 bg-white text-xs font-semibold text-[#1B133C] hover:bg-slate-50 shadow-2xs shrink-0"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Regenerate Code</span>
+              </button>
             </div>
 
-            <button
-              onClick={() => generatePairingCode()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/10 bg-white text-xs font-semibold text-[#1B133C] hover:bg-slate-50 shadow-2xs shrink-0"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Regenerate Code</span>
-            </button>
+            <div className="flex flex-col sm:flex-row items-center gap-4 p-5 rounded-2xl bg-[#1B133C] text-white">
+              <div className="space-y-1 text-center sm:text-left flex-1">
+                <span className="text-[11px] uppercase tracking-wider text-white/60 font-medium">Active Verification Code</span>
+                <div className="flex items-center justify-center sm:justify-start gap-3">
+                  <span className="font-mono text-3xl font-extrabold tracking-widest text-emerald-400">
+                    {pairingCode || 'AX-8492'}
+                  </span>
+                  <button
+                    onClick={handleCopyCode}
+                    className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-all text-white/80"
+                    title="Copy code"
+                  >
+                    {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-xs text-white/70 max-w-xs text-center sm:text-right">
+                Valid for 15 minutes. Automatically links your browser DOM inspector with authenticated GitHub repos.
+              </div>
+            </div>
           </div>
-
-          <div className="flex flex-col sm:flex-row items-center gap-4 p-5 rounded-2xl bg-[#1B133C] text-white">
-            <div className="space-y-1 text-center sm:text-left flex-1">
-              <span className="text-[11px] uppercase tracking-wider text-white/60 font-medium">Active Verification Code</span>
-              <div className="flex items-center justify-center sm:justify-start gap-3">
-                <span className="font-mono text-3xl font-extrabold tracking-widest text-emerald-400">
-                  {pairingCode || 'PW-8492'}
-                </span>
-                <button
-                  onClick={handleCopyCode}
-                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-all text-white/80"
-                  title="Copy code"
-                >
-                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                </button>
+        ) : (
+          <div className="glass-card p-6 md:p-8 border border-amber-200 bg-amber-50/40 space-y-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-xs">
+                !
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-bold text-base text-amber-950">Integrations Required for Token Generation</h3>
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  You must connect both <strong>GitHub</strong> and <strong>Vercel</strong> in your workspace settings before generating extension pairing tokens. This ensures the visual editor client has authorized repository and preview credentials.
+                </p>
               </div>
             </div>
 
-            <div className="text-xs text-white/70 max-w-xs text-center sm:text-right">
-              Valid for 15 minutes. Automatically links your browser DOM inspector with authenticated GitHub repos.
+            <div className="pt-2">
+              <Link
+                href="/settings/integrations"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1B133C] hover:bg-black text-white text-xs font-semibold transition-all shadow-xs"
+              >
+                <span>Go to Integrations Hub</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Connected Browser Sessions */}
         <div className="glass-card p-6 md:p-8 border border-white/80 space-y-6">

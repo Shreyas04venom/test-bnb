@@ -6,7 +6,8 @@
     "ownerId": "usr-owner-1",
     "plan": "Enterprise",
     "membersCount": 1,
-    "createdAt": "2026-09-28T12:11:52.958Z"
+    "createdAt": "2026-09-28T13:42:47.195Z",
+    "setupCompleted": false
   },
   "currentUser": {
     "id": "usr-owner-1",
@@ -20,26 +21,78 @@
   },
   "projects": [
     {
-      "id": "proj-1790597730939",
+      "id": "proj-1790603117822",
       "workspaceId": "ws-prod-1",
-      "name": "My Storefront",
-      "slug": "my-storefront",
-      "productionUrl": "https://my-app.com",
-      "framework": "Next.js",
-      "repositoryId": "repo-1790597730939",
-      "repositoryName": "org/storefront-web",
-      "repositoryUrl": "https://github.com/org/storefront-web",
+      "name": "Axon Production App",
+      "slug": "axon-production-app",
+      "productionUrl": "http://localhost:3000",
+      "framework": "React (Vite)",
+      "repositoryId": "repo-1790603117822",
+      "repositoryName": "axon-org/production-app",
+      "repositoryUrl": "https://github.com/axon-org/production-app",
       "deploymentProvider": "vercel",
-      "deploymentProjectId": "deploy_prj_1790597730939",
+      "deploymentProjectId": "prj_axon_1790603117822",
       "defaultBranch": "main",
       "status": "production_healthy",
       "ownershipStatus": "verified",
-      "verifiedAt": "2026-09-28T12:15:30.939Z",
-      "createdAt": "2026-09-28T12:15:30.939Z",
-      "updatedAt": "2026-09-28T12:15:30.939Z"
+      "verifiedAt": "2026-09-28T13:45:17.822Z",
+      "createdAt": "2026-09-28T13:45:17.822Z",
+      "updatedAt": "2026-09-28T13:45:17.822Z"
     }
   ],
-  "patches": [],
+  "patches": [
+    {
+      "id": "PW-101",
+      "projectId": "proj-1790603117822",
+      "workspaceId": "ws-prod-1",
+      "author": {
+        "id": "usr-owner-1",
+        "name": "Shreyas (Team Lead)",
+        "email": "shreyas@axon.dev",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "UTC",
+        "githubUsername": "shreyas-axon"
+      },
+      "title": "feat: responsive nav style hotfix",
+      "description": "Git commit 841ff84 dispatched from Axon Chrome Extension directly to main",
+      "status": "DEPLOYED",
+      "riskLevel": "LOW",
+      "branchName": "main",
+      "commitSha": "841ff84",
+      "previewUrl": "http://localhost:3000",
+      "files": [
+        {
+          "filename": "src/styles/overrides.css",
+          "category": "frontend",
+          "changeType": "modified",
+          "additions": 14,
+          "deletions": 2,
+          "diffSummary": "Committed visual DOM styling and token overrides via Axon Extension"
+        }
+      ],
+      "comments": [],
+      "reviews": [],
+      "source": "extension",
+      "createdAt": "2026-09-28T14:13:47.895Z",
+      "updatedAt": "2026-09-28T14:13:47.895Z",
+      "aiSummary": {
+        "explanation": "Staged and committed 1 visual AST changes directly into Git branch main.",
+        "why": "Immediate visual production hotfix applied via Axon Visual Inspector.",
+        "affectedComponents": [
+          "Visual DOM Styles",
+          "CSS Overrides"
+        ],
+        "potentialRisks": [
+          "Verify mobile breakpoint scaling"
+        ],
+        "dependencies": [
+          "DOM Token Sync"
+        ]
+      }
+    }
+  ],
   "collaborators": [
     {
       "id": "mem-1",
@@ -56,34 +109,109 @@
         "githubUsername": "shreyas-axon"
       },
       "role": "owner",
-      "joinedAt": "2026-09-28T12:11:52.971Z",
+      "joinedAt": "2026-09-28T13:42:47.234Z",
       "status": "active"
     }
   ],
   "extensionSessions": [],
-  "deployments": [],
+  "deployments": [
+    {
+      "id": "DEP-620",
+      "projectId": "proj-1790603117822",
+      "patchId": "PW-101",
+      "environment": "production",
+      "provider": "vercel",
+      "commitSha": "841ff84",
+      "branch": "main",
+      "author": {
+        "id": "usr-owner-1",
+        "name": "Shreyas (Team Lead)",
+        "email": "shreyas@axon.dev",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "UTC",
+        "githubUsername": "shreyas-axon"
+      },
+      "status": "READY",
+      "previewUrl": "http://localhost:3000",
+      "durationSeconds": 19,
+      "createdAt": "2026-09-28T14:13:47.897Z"
+    }
+  ],
   "verifications": [],
   "auditLogs": [
     {
-      "id": "aud-1790597730939",
-      "action": "PROJECT_CREATED",
-      "user": "Shreyas (Team Lead)",
-      "userId": "usr-owner-1",
-      "projectId": "proj-1790597730939",
-      "projectName": "My Storefront",
-      "timestamp": "2026-09-28T12:15:30.939Z",
+      "id": "aud-1790604879506-x5cd",
+      "action": "ROLLBACK_TRIGGERED",
+      "user": {
+        "id": "usr-owner-1",
+        "name": "Shreyas (Team Lead)",
+        "email": "shreyas@axon.dev",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "UTC",
+        "githubUsername": "shreyas-axon"
+      },
+      "timestamp": "2026-09-28T14:14:39.506Z",
+      "ip": "127.0.0.1",
+      "userAgent": "node",
       "result": "success",
       "metadata": {
-        "repo": "org/storefront-web",
-        "url": "https://my-app.com"
+        "targetVersion": "v1.0.0",
+        "rollbackVersion": "v1.3.0",
+        "reason": "Testing rollback mechanism",
+        "revertSha": "c0a38ae"
       }
     },
     {
+      "id": "aud-1790604827899-5h9k",
+      "action": "DEPLOYMENT_COMPLETED",
+      "user": {
+        "id": "usr-owner-1",
+        "name": "Shreyas (Team Lead)",
+        "email": "shreyas@axon.dev",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "UTC",
+        "githubUsername": "shreyas-axon"
+      },
+      "timestamp": "2026-09-28T14:13:47.900Z",
+      "ip": "127.0.0.1",
+      "userAgent": "node",
+      "result": "success",
+      "metadata": {
+        "commitSha": "841ff84",
+        "branch": "main",
+        "version": "v1.2.0",
+        "commitMessage": "feat: responsive nav style hotfix",
+        "gitPipeline": [
+          "git add .",
+          "git commit -m \"feat: responsive nav style hotfix\"",
+          "git push origin main"
+        ]
+      },
+      "projectId": "proj-1790603117822",
+      "patchId": "PW-101"
+    },
+    {
       "id": "aud-init",
-      "action": "WORKSPACE_SETTINGS_UPDATED",
-      "user": "System",
-      "userId": "usr-owner-1",
-      "timestamp": "2026-09-28T12:11:52.971Z",
+      "action": "WORKSPACE_UPDATED",
+      "user": {
+        "id": "usr-owner-1",
+        "name": "Shreyas (Team Lead)",
+        "email": "shreyas@axon.dev",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "UTC",
+        "githubUsername": "shreyas-axon"
+      },
+      "timestamp": "2026-09-28T13:42:47.234Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Axon Server Boot",
       "result": "success",
       "metadata": {
         "note": "Production Axon workspace initialized"
@@ -91,21 +219,115 @@
     }
   ],
   "conflicts": [],
+  "versions": [
+    {
+      "version": "v1.3.0",
+      "commitSha": "c0a38ae",
+      "title": "Safe Revert to Initial Production Base Release (v1.0.0)",
+      "author": {
+        "id": "usr-owner-1",
+        "name": "Shreyas (Team Lead)",
+        "email": "shreyas@axon.dev",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "UTC",
+        "githubUsername": "shreyas-axon"
+      },
+      "deployedAt": "2026-09-28T14:14:39.505Z",
+      "status": "active",
+      "deploymentId": "DEP-199",
+      "rollbackPossible": true
+    },
+    {
+      "version": "v1.2.0",
+      "commitSha": "841ff84",
+      "patchId": "PW-101",
+      "title": "feat: responsive nav style hotfix",
+      "author": {
+        "id": "usr-owner-1",
+        "name": "Shreyas (Team Lead)",
+        "email": "shreyas@axon.dev",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "UTC",
+        "githubUsername": "shreyas-axon"
+      },
+      "deployedAt": "2026-09-28T14:13:47.897Z",
+      "status": "reverted",
+      "deploymentId": "DEP-620",
+      "rollbackPossible": true
+    },
+    {
+      "version": "v1.0.0",
+      "commitSha": "a1b2c3d",
+      "title": "Initial Production Base Release",
+      "author": {
+        "id": "usr-owner-1",
+        "name": "Shreyas (Team Lead)",
+        "email": "shreyas@axon.dev",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "UTC",
+        "githubUsername": "shreyas-axon"
+      },
+      "deployedAt": "2026-09-26T13:59:11.329Z",
+      "status": "superseded",
+      "deploymentId": "DEP-100",
+      "rollbackPossible": false
+    }
+  ],
   "integrations": {
     "github": {
       "connected": true,
       "org": "axon-team",
-      "appInstalled": true
+      "accountType": "organization",
+      "appInstalled": true,
+      "repositories": [
+        "axon-core",
+        "axon-studio"
+      ],
+      "permissions": [
+        "repo",
+        "workflow"
+      ],
+      "lastSync": "2026-09-28T13:42:47.234Z"
     },
     "vercel": {
       "connected": true,
-      "team": "axon-prod"
+      "team": "axon-prod",
+      "projects": [
+        "axon-app"
+      ],
+      "domains": [
+        "axon.dev"
+      ],
+      "lastSync": "2026-09-28T13:42:47.234Z"
     },
     "netlify": {
-      "connected": false
+      "connected": false,
+      "team": "",
+      "sites": [],
+      "lastSync": "2026-09-28T13:42:47.234Z"
     },
     "supabase": {
-      "connected": false
+      "connected": false,
+      "projectUrl": "",
+      "anonKeyConfigured": false,
+      "serviceRoleConfigured": false,
+      "realtimeEnabled": false,
+      "lastSync": "2026-09-28T13:42:47.234Z"
+    },
+    "ai": {
+      "provider": "gemini",
+      "model": "gemini-1.5-pro",
+      "temperature": 0.2,
+      "allowFrontendModifications": true,
+      "allowBackendModifications": false,
+      "requireApprovalForBackend": true,
+      "requireApprovalForHighRisk": true
     }
   }
 }

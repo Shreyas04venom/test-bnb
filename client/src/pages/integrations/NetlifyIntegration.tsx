@@ -15,7 +15,7 @@ import {
 export default function NetlifyIntegrationPage() {
   const { integrations, updateIntegrations, logAudit, projects: storeProjects } = usePatchworkStore();
   const [isSyncing, setIsSyncing] = useState(false);
-  const [connected, setConnected] = useState(integrations.netlify.connected);
+  const [connected, setConnected] = useState(Boolean(integrations?.netlify?.connected));
 
   const sites = storeProjects.length > 0
     ? storeProjects.map((p) => ({

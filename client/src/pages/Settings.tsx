@@ -63,11 +63,11 @@ export default function SettingsPage() {
   const [invitedSuccess, setInvitedSuccess] = useState(false);
 
   // AI settings
-  const [aiProvider, setAiProvider] = useState(integrations.ai.provider);
-  const [aiModel, setAiModel] = useState(integrations.ai.model);
-  const [allowFrontend, setAllowFrontend] = useState(integrations.ai.allowFrontendModifications);
-  const [allowBackend, setAllowBackend] = useState(integrations.ai.allowBackendModifications);
-  const [requireHighRiskApproval, setRequireHighRiskApproval] = useState(integrations.ai.requireApprovalForHighRisk);
+  const [aiProvider, setAiProvider] = useState(integrations?.ai?.provider || 'gemini');
+  const [aiModel, setAiModel] = useState(integrations?.ai?.model || 'gemini-1.5-pro');
+  const [allowFrontend, setAllowFrontend] = useState(integrations?.ai?.allowFrontendModifications ?? true);
+  const [allowBackend, setAllowBackend] = useState(integrations?.ai?.allowBackendModifications ?? false);
+  const [requireHighRiskApproval, setRequireHighRiskApproval] = useState(integrations?.ai?.requireApprovalForHighRisk ?? true);
 
   const handleSyncGithub = () => {
     setGithubSyncing(true);
@@ -196,7 +196,7 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <h4 className="font-bold text-sm text-[#1B133C]">GitHub App</h4>
-                      <p className="text-[11px] text-muted-foreground">Org: {integrations.github.org}</p>
+                      <p className="text-[11px] text-muted-foreground">Org: {integrations?.github?.org || 'axon-team'}</p>
                     </div>
                   </div>
                   <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold">
@@ -207,7 +207,7 @@ export default function SettingsPage() {
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between text-muted-foreground">
                     <span>Installed Repositories:</span>
-                    <strong className="text-[#1B133C]">{integrations.github.repositories.length} repos</strong>
+                    <strong className="text-[#1B133C]">{(integrations?.github?.repositories || []).length} repos</strong>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>Permissions:</span>
@@ -215,7 +215,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>Last Sync:</span>
-                    <span>{integrations.github.lastSync}</span>
+                    <span>{integrations?.github?.lastSync || 'Just now'}</span>
                   </div>
                 </div>
 
@@ -241,7 +241,7 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <h4 className="font-bold text-sm text-[#1B133C]">Vercel</h4>
-                      <p className="text-[11px] text-muted-foreground">Team: {integrations.vercel.team}</p>
+                      <p className="text-[11px] text-muted-foreground">Team: {integrations?.vercel?.team || 'axon-prod'}</p>
                     </div>
                   </div>
                   <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold">
@@ -252,15 +252,15 @@ export default function SettingsPage() {
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between text-muted-foreground">
                     <span>Linked Projects:</span>
-                    <strong className="text-[#1B133C]">{integrations.vercel.projects.join(', ')}</strong>
+                    <strong className="text-[#1B133C]">{(integrations?.vercel?.projects || []).join(', ') || 'axon-app'}</strong>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>Domains:</span>
-                    <strong className="text-[#1B133C]">{integrations.vercel.domains.join(', ')}</strong>
+                    <strong className="text-[#1B133C]">{(integrations?.vercel?.domains || []).join(', ') || 'axon.dev'}</strong>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>Last Sync:</span>
-                    <span>{integrations.vercel.lastSync}</span>
+                    <span>{integrations?.vercel?.lastSync || 'Just now'}</span>
                   </div>
                 </div>
 
@@ -286,18 +286,20 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <h4 className="font-bold text-sm text-[#1B133C]">Netlify</h4>
-                      <p className="text-[11px] text-muted-foreground">Team: {integrations.netlify.team}</p>
+                      <p className="text-[11px] text-muted-foreground">Team: {integrations?.netlify?.team || 'Not Configured'}</p>
                     </div>
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold">
-                    Connected ✓
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                    integrations?.netlify?.connected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {integrations?.netlify?.connected ? 'Connected ✓' : 'Disconnected'}
                   </span>
                 </div>
 
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between text-muted-foreground">
                     <span>Connected Sites:</span>
-                    <strong className="text-[#1B133C]">{integrations.netlify.sites.join(', ')}</strong>
+                    <strong className="text-[#1B133C]">{(integrations?.netlify?.sites || []).join(', ') || 'None'}</strong>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>Adapter:</span>
@@ -305,7 +307,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>Last Sync:</span>
-                    <span>{integrations.netlify.lastSync}</span>
+                    <span>{integrations?.netlify?.lastSync || 'Not synced'}</span>
                   </div>
                 </div>
 

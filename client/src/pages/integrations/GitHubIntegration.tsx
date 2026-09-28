@@ -18,7 +18,7 @@ import {
 export default function GitHubIntegrationPage() {
   const { integrations, updateIntegrations, logAudit, projects: storeProjects, patches } = usePatchworkStore();
   const [isSyncing, setIsSyncing] = useState(false);
-  const [connected, setConnected] = useState(integrations.github.connected);
+  const [connected, setConnected] = useState(Boolean(integrations?.github?.connected));
 
   const repos = storeProjects.length > 0
     ? storeProjects.map((p) => ({

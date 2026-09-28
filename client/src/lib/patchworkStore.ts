@@ -40,6 +40,7 @@ export const INITIAL_WORKSPACE: Workspace = {
   plan: 'Enterprise',
   membersCount: 1,
   createdAt: new Date().toISOString(),
+  setupCompleted: false,
 };
 
 export const SEED_CURRENT_USER = INITIAL_USER;
@@ -243,8 +244,9 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
             const json = await res.json();
             if (json.success && json.data) {
               const d = json.data;
+              const curIntegrations = get().integrations;
               set({
-                workspace: d.workspace || get().workspace,
+                workspace: d.workspace ? { ...get().workspace, ...d.workspace } : get().workspace,
                 currentUser: d.currentUser || get().currentUser,
                 projects: d.projects || [],
                 patches: d.patches || [],
@@ -253,8 +255,17 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
                 deployments: d.deployments || [],
                 auditLogs: d.auditLogs || [],
                 conflicts: d.conflicts || [],
-                integrations: d.integrations || get().integrations,
-                activeProjectId: d.projects?.[0]?.id || get().activeProjectId || '',
+                versions: d.versions || get().versions,
+                integrations: {
+                  ...curIntegrations,
+                  ...(d.integrations || {}),
+                  github: { ...curIntegrations.github, ...(d.integrations?.github || {}) },
+                  vercel: { ...curIntegrations.vercel, ...(d.integrations?.vercel || {}) },
+                  netlify: { ...curIntegrations.netlify, ...(d.integrations?.netlify || {}) },
+                  supabase: { ...curIntegrations.supabase, ...(d.integrations?.supabase || {}) },
+                  ai: { ...curIntegrations.ai, ...(d.integrations?.ai || {}) },
+                },
+                activeProjectId: d.projects?.[0]?.id || '',
               });
             }
           }
@@ -659,8 +670,41 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
         return newDep;
       },
 
-      triggerRollback: (version: VersionItem, reason: string) => {
+      triggerRollback: async (version: VersionItem, reason: string) => {
+        try {
+          const res = await fetch(`/api/versions/${encodeURIComponent(version.version)}/rollback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason }),
+          });
+          if (res.ok) {
+            const json = await res.json();
+            if (json.versions) {
+              set({
+                versions: json.versions,
+                patches: get().patches.map((p) =>
+                  p.id === version.patchId ? { ...p, status: 'ROLLED_BACK' } : p
+                ),
+              });
+              get().logAudit('ROLLBACK_TRIGGERED', {
+                patchId: version.patchId,
+                metadata: { version: version.version, reason },
+              });
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('[PatchworkStore] Rollback API call failed:', err);
+        }
+
         set((state) => ({
+          versions: state.versions.map((v) =>
+            v.version === version.version
+              ? { ...v, status: 'active' }
+              : v.status === 'active'
+              ? { ...v, status: 'reverted' }
+              : v
+          ),
           patches: state.patches.map((p) =>
             p.id === version.patchId ? { ...p, status: 'ROLLED_BACK' } : p
           ),

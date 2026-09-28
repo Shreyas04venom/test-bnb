@@ -22,6 +22,7 @@ export interface Workspace {
   plan: 'Starter' | 'Pro' | 'Enterprise';
   membersCount: number;
   createdAt: string;
+  setupCompleted?: boolean;
 }
 
 export interface WorkspaceMember {

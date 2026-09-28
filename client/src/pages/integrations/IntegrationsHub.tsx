@@ -20,6 +20,10 @@ import {
 export default function IntegrationsHubPage() {
   const { integrations } = usePatchworkStore();
 
+  const githubReposCount = (integrations?.github?.repositories || []).length;
+  const vercelProjectsCount = (integrations?.vercel?.projects || []).length;
+  const netlifySitesCount = (integrations?.netlify?.sites || []).length;
+
   const integrationList = [
     {
       id: 'github',
@@ -27,8 +31,8 @@ export default function IntegrationsHubPage() {
       description: 'Create branches, commit visual AST modifications, and open Pull Requests directly from live website edits.',
       icon: GitHubIcon,
       iconBg: 'bg-black text-white',
-      connected: integrations.github.connected,
-      meta: `Org: ${integrations.github.org} • ${integrations.github.repositories.length} repos`,
+      connected: Boolean(integrations?.github?.connected),
+      meta: `Org: ${integrations?.github?.org || 'axon-team'} • ${githubReposCount} repos`,
       href: '/settings/integrations/github',
       tag: 'Source of Truth'
     },
@@ -38,8 +42,8 @@ export default function IntegrationsHubPage() {
       description: 'Spin up instant preview environments for visual patches and trigger zero-downtime production promotions.',
       icon: VercelIcon,
       iconBg: 'bg-black text-white',
-      connected: integrations.vercel.connected,
-      meta: `Team: ${integrations.vercel.team} • ${integrations.vercel.projects.length} projects`,
+      connected: Boolean(integrations?.vercel?.connected),
+      meta: `Team: ${integrations?.vercel?.team || 'axon-prod'} • ${vercelProjectsCount} projects`,
       href: '/settings/integrations/vercel',
       tag: 'Cloud Edge Hosting'
     },
@@ -49,8 +53,8 @@ export default function IntegrationsHubPage() {
       description: 'Branch deploy previews, edge handlers, and automated webhook notifications on patch merge.',
       icon: NetlifyIcon,
       iconBg: 'bg-[#00AD9F] text-white',
-      connected: integrations.netlify.connected,
-      meta: `Team: ${integrations.netlify.team} • ${integrations.netlify.sites.length} sites`,
+      connected: Boolean(integrations?.netlify?.connected),
+      meta: `Team: ${integrations?.netlify?.team || 'Not Configured'} • ${netlifySitesCount} sites`,
       href: '/settings/integrations/netlify',
       tag: 'Edge Handlers'
     },
@@ -60,7 +64,7 @@ export default function IntegrationsHubPage() {
       description: 'PostgreSQL relational storage with Row Level Security (RLS) and multi-cursor real-time broadcast channels.',
       icon: SupabaseIcon,
       iconBg: 'bg-[#3ECF8E] text-black',
-      connected: integrations.supabase.connected,
+      connected: Boolean(integrations?.supabase?.connected),
       meta: 'PostgreSQL • Realtime Channels Active',
       href: '/settings/integrations/supabase',
       tag: 'Database & Presence'

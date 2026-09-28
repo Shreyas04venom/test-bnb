@@ -18,7 +18,7 @@ import {
 export default function VercelIntegrationPage() {
   const { integrations, updateIntegrations, logAudit, projects: storeProjects } = usePatchworkStore();
   const [isSyncing, setIsSyncing] = useState(false);
-  const [connected, setConnected] = useState(integrations.vercel.connected);
+  const [connected, setConnected] = useState(Boolean(integrations?.vercel?.connected));
 
   const projects = storeProjects.length > 0
     ? storeProjects.map((p) => ({

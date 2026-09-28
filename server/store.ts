@@ -12,6 +12,7 @@ import type {
   IntegrationsConfig,
   ConflictItem,
   User,
+  VersionItem,
 } from '../shared/patchwork-types';
 
 export interface PresenceRecord {
@@ -50,6 +51,7 @@ export interface AxonStoreData {
   auditLogs: AuditLog[];
   conflicts: ConflictItem[];
   integrations: IntegrationsConfig;
+  versions: VersionItem[];
 }
 
 const DATA_DIR = path.resolve(process.cwd(), 'server', 'data');
@@ -74,7 +76,21 @@ const DEFAULT_WORKSPACE: Workspace = {
   plan: 'Enterprise',
   membersCount: 1,
   createdAt: new Date().toISOString(),
+  setupCompleted: false,
 };
+
+const DEFAULT_VERSIONS: VersionItem[] = [
+  {
+    version: 'v1.0.0',
+    commitSha: 'a1b2c3d',
+    title: 'Initial Production Base Release',
+    author: DEFAULT_USER,
+    deployedAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+    status: 'active',
+    deploymentId: 'DEP-100',
+    rollbackPossible: false,
+  },
+];
 
 const DEFAULT_STORE: AxonStoreData = {
   workspace: DEFAULT_WORKSPACE,
@@ -108,6 +124,7 @@ const DEFAULT_STORE: AxonStoreData = {
     },
   ],
   conflicts: [],
+  versions: DEFAULT_VERSIONS,
   integrations: {
     github: {
       connected: true,
@@ -172,7 +189,21 @@ export function loadStore(): AxonStoreData {
     if (fs.existsSync(STORE_FILE)) {
       const raw = fs.readFileSync(STORE_FILE, 'utf-8');
       const parsed = JSON.parse(raw);
-      storeData = { ...DEFAULT_STORE, ...parsed };
+      storeData = {
+        ...DEFAULT_STORE,
+        ...parsed,
+        workspace: { ...DEFAULT_STORE.workspace, ...(parsed.workspace || {}) },
+        integrations: {
+          ...DEFAULT_STORE.integrations,
+          ...(parsed.integrations || {}),
+          github: { ...DEFAULT_STORE.integrations.github, ...(parsed.integrations?.github || {}) },
+          vercel: { ...DEFAULT_STORE.integrations.vercel, ...(parsed.integrations?.vercel || {}) },
+          netlify: { ...DEFAULT_STORE.integrations.netlify, ...(parsed.integrations?.netlify || {}) },
+          supabase: { ...DEFAULT_STORE.integrations.supabase, ...(parsed.integrations?.supabase || {}) },
+          ai: { ...DEFAULT_STORE.integrations.ai, ...(parsed.integrations?.ai || {}) },
+        },
+        versions: Array.isArray(parsed.versions) && parsed.versions.length > 0 ? parsed.versions : DEFAULT_VERSIONS,
+      };
       return storeData;
     }
   } catch (err) {
@@ -206,6 +237,7 @@ export function resetStore(seedStarter = false): AxonStoreData {
       deployments: [],
       verifications: [],
       conflicts: [],
+      versions: Array.isArray(storeData.versions) && storeData.versions.length > 0 ? storeData.versions : DEFAULT_VERSIONS,
       auditLogs: [
         {
           id: `aud-${Date.now()}`,

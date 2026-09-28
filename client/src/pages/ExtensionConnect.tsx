@@ -26,7 +26,12 @@ export default function ExtensionConnectPage() {
     generatePairingCode,
     approveExtensionPairing,
     pairingCode,
+    integrations,
   } = usePatchworkStore();
+
+  const areIntegrationsReady = Boolean(
+    integrations?.github?.connected && integrations?.vercel?.connected
+  );
 
   const [approved, setApproved] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -44,6 +49,8 @@ export default function ExtensionConnectPage() {
 
   // Detect extension via postMessage ping
   useEffect(() => {
+    if (!areIntegrationsReady) return;
+
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'AXON_PONG' || event.data?.type === 'AXON_EXTENSION_READY') {
         setExtensionDetected(true);
@@ -60,7 +67,12 @@ export default function ExtensionConnectPage() {
     window.postMessage({ type: 'AXON_PING' }, '*');
 
     // Also auto-generate pairing code on mount if missing
-    if (!pairingCode) {
+    // Detect code param if passed from extension
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramCode = urlParams.get('code');
+    if (paramCode) {
+      setActiveCode(paramCode);
+    } else if (!pairingCode) {
       generatePairingCode().then((c) => setActiveCode(c));
     } else {
       setActiveCode(pairingCode);
@@ -74,25 +86,44 @@ export default function ExtensionConnectPage() {
       window.removeEventListener('message', handleMessage);
       clearInterval(timer);
     };
-  }, []);
+  }, [areIntegrationsReady]);
 
   const handleApprove = async () => {
     try {
       const session = await approveExtensionPairing("Chrome Inspector Client");
       
+      const sessionPayload = {
+        token: session.id,
+        serverUrl: window.location.origin,
+        workspace,
+        user: currentUser,
+        activeProjectId: projects[0]?.id || null,
+        projects,
+      };
+
       // Broadcast to extension content script
       window.postMessage(
         {
           type: 'AXON_CONNECT_REQUEST',
-          token: session.id,
-          serverUrl: window.location.origin,
-          workspace,
-          user: currentUser,
-          activeProjectId: projects[0]?.id || null,
-          projects,
+          ...sessionPayload,
         },
         '*'
       );
+
+      // Also set directly if chrome storage is accessible
+      try {
+        const winChrome = (window as any).chrome;
+        if (winChrome && winChrome.storage && winChrome.storage.local) {
+          winChrome.storage.local.set({ axon_auth_session: sessionPayload });
+        }
+      } catch {}
+
+      // If opened via popup window, notify parent
+      try {
+        if (window.opener) {
+          window.opener.postMessage({ type: 'AXON_CONNECT_SUCCESS', ...sessionPayload }, '*');
+        }
+      } catch {}
 
       setApproved(true);
       toast.success('Axon Extension authorized and paired!');
@@ -122,6 +153,72 @@ export default function ExtensionConnectPage() {
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
+
+  if (!areIntegrationsReady) {
+    return (
+      <div className="min-h-screen bg-[#f3f1ec] text-[#1B133C] py-12 px-4 sm:px-6 flex flex-col justify-center items-center">
+        <div className="max-w-md w-full text-center mb-6">
+          <Link href="/dashboard" className="inline-block mb-4">
+            <PatchworkLogo size="md" />
+          </Link>
+          <h2 className="font-serif text-3xl text-[#1B133C]">
+            Integrations Required First
+          </h2>
+          <p className="text-xs text-[#1B133C]/70 mt-1">
+            Browser extension pairing requires authorized Git and deployment provider integrations.
+          </p>
+        </div>
+
+        <div className="max-w-md w-full glass-card p-6 sm:p-8 border border-white/80 shadow-xl space-y-6">
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 space-y-2">
+            <div className="flex items-center gap-2 font-bold text-xs">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span>Prerequisites Incomplete</span>
+            </div>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              Token code generation is disabled until both <strong>GitHub</strong> and <strong>Vercel</strong> are connected. The extension requires repository write access to commit visual AST patches and Vercel credentials to trigger edge previews.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 rounded-xl border border-black/10 bg-white text-xs">
+              <span className="font-semibold text-[#1B133C]">GitHub Integration</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                integrations?.github?.connected ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+              }`}>
+                {integrations?.github?.connected ? 'Connected ✓' : 'Not Connected ✕'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl border border-black/10 bg-white text-xs">
+              <span className="font-semibold text-[#1B133C]">Vercel Integration</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                integrations?.vercel?.connected ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+              }`}>
+                {integrations?.vercel?.connected ? 'Connected ✓' : 'Not Connected ✕'}
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-2 space-y-2.5">
+            <Link
+              href="/settings/integrations"
+              className="w-full py-3 px-4 rounded-xl bg-[#1B133C] hover:bg-black text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-md"
+            >
+              <span>Connect Integrations in Settings</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/dashboard"
+              className="w-full py-2.5 px-4 rounded-xl border border-black/10 bg-white hover:bg-slate-50 text-xs font-semibold text-[#1B133C] flex items-center justify-center transition-all text-center"
+            >
+              Back to Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f3f1ec] text-[#1B133C] py-12 px-4 sm:px-6 flex flex-col justify-center items-center">

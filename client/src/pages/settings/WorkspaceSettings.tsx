@@ -71,7 +71,7 @@ export default function WorkspaceSettingsPage() {
                 <label className="text-xs font-semibold text-[#1B133C]">Workspace URL Slug</label>
                 <div className="flex items-center rounded-xl border border-black/10 bg-white/90 overflow-hidden focus-within:ring-2 focus-within:ring-[#1B133C]/20">
                   <span className="px-3 text-xs text-muted-foreground bg-black/[0.02] border-r border-black/5 py-2.5">
-                    patchwork.dev/
+                    axon.dev/
                   </span>
                   <input
                     type="text"

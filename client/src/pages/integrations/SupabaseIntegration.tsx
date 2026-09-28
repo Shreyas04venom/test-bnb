@@ -16,7 +16,7 @@ import {
 export default function SupabaseIntegrationPage() {
   const { integrations, updateIntegrations, logAudit } = usePatchworkStore();
   const [isSyncing, setIsSyncing] = useState(false);
-  const [connected, setConnected] = useState(integrations.supabase.connected);
+  const [connected, setConnected] = useState(Boolean(integrations?.supabase?.connected));
 
   const handleSync = () => {
     setIsSyncing(true);

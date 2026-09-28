@@ -32,15 +32,24 @@ export default function RollbackPage() {
   const currentVersion = versions.find((v) => v.status === 'active') || versions[0];
   const rollbackCandidates = versions.filter((v) => v.status !== 'active' && v.rollbackPossible);
 
-  const handleConfirmRollback = () => {
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const target = params.get('target');
+    if (target) {
+      const match = versions.find((v) => v.version === target);
+      if (match) setSelectedVersion(match);
+    }
+  }, [versions]);
+
+  const handleConfirmRollback = async () => {
     if (!selectedVersion) return;
-    triggerRollback(selectedVersion, reason);
+    await triggerRollback(selectedVersion, reason);
     setSelectedVersion(null);
     setIsRollbackDone(true);
     setTimeout(() => {
       setIsRollbackDone(false);
-      setLocation('/dashboard');
-    }, 2500);
+      setLocation('/versions');
+    }, 2000);
   };
 
   return (

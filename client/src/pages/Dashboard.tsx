@@ -108,23 +108,8 @@ export default function DashboardPage() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1B133C] text-white text-xs font-semibold shadow-md hover:bg-black transition-all"
               >
                 <Plus className="w-4 h-4" />
-                <span>Create New Project</span>
+                <span>Create Your First Project</span>
               </Link>
-              <Link
-                href="/extension-connect"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-black/10 bg-white text-[#1B133C] text-xs font-semibold shadow-2xs hover:bg-slate-50 transition-all"
-              >
-                <Chrome className="w-4 h-4 text-indigo-600" />
-                <span>Pair Chrome Extension</span>
-              </Link>
-              <button
-                onClick={() => seedStarterProject()}
-                disabled={isLoading}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition-all"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Seed Starter Demo Project</span>
-              </button>
             </div>
           </div>
         ) : (

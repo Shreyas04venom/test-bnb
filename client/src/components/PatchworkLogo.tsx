@@ -10,23 +10,13 @@ export function PatchworkIcon({ className = 'w-6 h-6' }: { className?: string })
   return (
     <svg
       className={className}
-      viewBox="0 0 40 40"
+      viewBox="0 0 256 256"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      aria-label="PATCHWORK Icon"
+      aria-label="AXON Icon"
     >
-      {/* Visual patch layer 1 */}
-      <rect x="6" y="6" width="16" height="16" rx="4" fill="#1B133C" />
-      {/* Visual patch layer 2 with weave accent */}
-      <rect x="18" y="18" width="16" height="16" rx="4" fill="#1B133C" />
-      {/* Interlocking patch junction */}
-      <path
-        d="M18 10C18 7.79086 19.7909 6 22 6H30C32.2091 6 34 7.79086 34 10V18C34 20.2091 32.2091 22 30 22H22C19.7909 22 18 20.2091 18 18V10Z"
-        fill="#6366F1"
-        fillOpacity="0.85"
-      />
-      <circle cx="14" cy="14" r="2.5" fill="#FFFFFF" />
-      <circle cx="26" cy="26" r="2.5" fill="#FFFFFF" />
+      <path d="M 256 256 L 128 256 L 0 128 L 128 128 Z" fill="#1B133C" />
+      <path d="M 256 128 L 128 128 L 0 0 L 128 0 Z" fill="#1B133C" />
     </svg>
   );
 }
@@ -48,10 +38,13 @@ export function PatchworkLogo({ className = '', iconOnly = false, size = 'md' }:
     <div className={`inline-flex items-center gap-2.5 font-semibold ${className}`}>
       <PatchworkIcon className={iconSizes[size]} />
       {!iconOnly && (
-        <span className={`font-sans font-bold uppercase text-[#1B133C] ${textSizes[size]}`}>
-          PATCHWORK
+        <span className={`font-sans font-extrabold uppercase text-[#1B133C] tracking-tight ${textSizes[size]}`}>
+          AXON
         </span>
       )}
     </div>
   );
 }
+
+export const AxonLogo = PatchworkLogo;
+export const AxonIcon = PatchworkIcon;
