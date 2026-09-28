@@ -68,6 +68,32 @@ export default function VercelIntegrationPage() {
       <div className="max-w-4xl space-y-6">
         <SettingsNav currentTab="integrations" />
 
+        {/* Clerk Auth Integration Banner */}
+        <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/70 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-emerald-950">Authorized via Clerk Authentication</span>
+                <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.2 rounded-full border border-emerald-300">
+                  SSO Active ✓
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-800 mt-0.5">
+                Vercel preview deployment dispatches and webhook validations are authenticated by Clerk Single Sign-On. Scopes and API tokens are secured.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/settings/security"
+            className="text-xs font-semibold text-emerald-900 hover:text-emerald-950 underline shrink-0 whitespace-nowrap"
+          >
+            Manage in Security
+          </Link>
+        </div>
+
         {/* Status Card */}
         <div className="glass-card p-6 md:p-8 border border-white/80 space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-black/5">

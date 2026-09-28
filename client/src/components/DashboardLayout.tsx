@@ -20,8 +20,10 @@ import {
   AlertTriangle,
   Menu,
   X,
-  CheckCircle2
+  CheckCircle2,
+  User as UserIcon,
 } from 'lucide-react';
+import { useUser, useClerk } from '@clerk/clerk-react';
 import { PatchworkLogo } from './PatchworkLogo';
 import { CommandPalette } from './CommandPalette';
 import { NotificationCenter } from './NotificationCenter';
@@ -55,6 +57,20 @@ export function DashboardLayout({ children, title, subtitle, actions }: Dashboar
     switchUser,
     logout,
   } = usePatchworkStore();
+  const clerk = useClerk();
+  const { isSignedIn } = useUser();
+
+  const handleLogout = async () => {
+    logout();
+    if (isSignedIn) {
+      try {
+        await clerk.signOut();
+      } catch (err) {
+        console.error('Clerk signout:', err);
+      }
+    }
+    setLocation('/login');
+  };
 
   const activeProject = projects.find((p) => p.id === activeProjectId) || projects[0];
   const isExtensionConnected = extensionSessions.length > 0;
@@ -265,9 +281,27 @@ export function DashboardLayout({ children, title, subtitle, actions }: Dashboar
               ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setLocation('/settings/workspace')} className="text-xs">
-                Workspace Settings
+                <Settings className="w-3.5 h-3.5 mr-2" /> Workspace Settings
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => logout()} className="text-xs text-rose-600 font-medium">
+              <DropdownMenuItem onClick={() => setLocation('/settings/security')} className="text-xs">
+                <ShieldCheck className="w-3.5 h-3.5 mr-2 text-emerald-600" /> Security & Connected Accounts
+              </DropdownMenuItem>
+              {isSignedIn && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (clerk.openUserProfile) {
+                      clerk.openUserProfile();
+                    } else {
+                      setLocation('/settings/security');
+                    }
+                  }}
+                  className="text-xs text-indigo-700 font-medium"
+                >
+                  <UserIcon className="w-3.5 h-3.5 mr-2 text-indigo-600" /> Clerk Profile & OAuth
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-xs text-rose-600 font-medium">
                 <LogOut className="w-3.5 h-3.5 mr-2" /> Log out
               </DropdownMenuItem>
             </DropdownMenuContent>
