@@ -746,14 +746,14 @@
               </div>
 
               <div style="margin-bottom: 12px;">
-                <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600; margin-bottom: 4px;">6-Digit Pairing PIN</label>
-                <input id="axon-modal-pin" type="text" maxlength="6" placeholder="e.g. 849201" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid #6366F1; border-radius: 6px; color: #10B981; padding: 8px; font-size: 16px; font-family: monospace; font-weight: bold; letter-spacing: 4px; text-align: center; outline: none;" />
+                <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600; margin-bottom: 4px;">Pairing PIN or Access Token</label>
+                <input id="axon-modal-pin" type="text" maxlength="128" placeholder="e.g. 849201 or token" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid #6366F1; border-radius: 6px; color: #10B981; padding: 8px; font-size: 14px; font-family: monospace; font-weight: bold; letter-spacing: 2px; text-align: center; outline: none;" />
               </div>
 
               <div id="axon-modal-error" style="display: none; color: #F87171; font-size: 11px; margin-bottom: 10px;"></div>
 
               <button id="axon-modal-pair" style="width: 100%; padding: 8px; border-radius: 6px; background: #3730A3; border: 1px solid #4F46E5; color: #FFFFFF; font-weight: 600; font-size: 11px; cursor: pointer;">
-                Authorize with PIN
+                Authorize with PIN / Token
               </button>
             `
           }
@@ -794,13 +794,13 @@
         const pin = pinInput.value.trim();
         const sUrl = urlInput.value.trim() || DEFAULT_SERVER_URL;
         if (!pin) {
-          errorDiv.textContent = 'Please enter the 6-digit PIN.';
+          errorDiv.textContent = 'Please enter your 6-digit PIN or session token.';
           errorDiv.style.display = 'block';
           return;
         }
 
         pairBtn.disabled = true;
-        pairBtn.textContent = 'Verifying PIN...';
+        pairBtn.textContent = 'Verifying Authorization...';
         errorDiv.style.display = 'none';
 
         const result = await pairWithCode(pin, sUrl);
@@ -809,7 +809,7 @@
           showToast(`🟢 Connected to ${result.workspace.name}!`);
         } else {
           pairBtn.disabled = false;
-          pairBtn.textContent = 'Authorize with PIN';
+          pairBtn.textContent = 'Authorize with PIN / Token';
           errorDiv.textContent = result.error || 'Connection failed.';
           errorDiv.style.display = 'block';
         }

@@ -54,24 +54,43 @@ function ClerkUserSync() {
 
   useEffect(() => {
     if (isLoaded && isSignedIn && user) {
-      const email = user.primaryEmailAddress?.emailAddress || "developer@axon.dev";
-      const name = user.fullName || user.firstName || email.split("@")[0];
+      const email =
+        user.primaryEmailAddress?.emailAddress ||
+        user.emailAddresses?.[0]?.emailAddress ||
+        "developer@axon.dev";
+      const name =
+        user.fullName ||
+        [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+        user.username ||
+        (email ? email.split("@")[0] : "Axon User");
       const avatar =
-        user.imageUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${name}`;
+        user.imageUrl ||
+        `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
 
       const githubAccount = user.externalAccounts?.find(
-        (acc: any) => acc.provider === "github" || acc.provider === "oauth_github"
+        (acc: any) =>
+          acc.provider === "github" ||
+          acc.provider === "oauth_github" ||
+          acc.providerSlug === "github" ||
+          (typeof acc.provider === "string" && acc.provider.toLowerCase().includes("github"))
       );
-      const githubUsername = (githubAccount as any)?.username || undefined;
+      const githubUsername =
+        (githubAccount as any)?.username ||
+        (githubAccount as any)?.label ||
+        (githubAccount as any)?.externalUsername ||
+        (user.username && !user.username.includes("@") ? user.username : undefined) ||
+        (typeof window !== "undefined" ? localStorage.getItem("axon_github_username") || undefined : undefined);
 
       const connectedProviders = user.externalAccounts?.map((acc: any) => acc.provider) || [];
       const isEmailVerified = user.primaryEmailAddress?.verification?.status === "verified";
 
       if (
         !currentUser ||
+        currentUser.clerkId !== user.id ||
         currentUser.email !== email ||
         currentUser.name !== name ||
-        currentUser.id !== user.id
+        currentUser.avatar !== avatar ||
+        currentUser.githubUsername !== githubUsername
       ) {
         switchUser({
           id: user.id,
@@ -81,14 +100,14 @@ function ClerkUserSync() {
           avatar,
           role: "owner",
           cursorColor: currentUser?.cursorColor || "#6366F1",
-          timezone: "UTC",
-          githubUsername: githubUsername || currentUser?.githubUsername,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          githubUsername,
           isEmailVerified,
           connectedProviders,
         });
       }
     }
-  }, [isLoaded, isSignedIn, user]);
+  }, [isLoaded, isSignedIn, user, currentUser]);
 
   return null;
 }
@@ -141,15 +160,15 @@ function Router() {
       <Route path="/audit" component={AuditLogsPage} />
       <Route path="/notifications" component={DashboardPage} />
 
-      {/* Dedicated Workspace Settings Routes */}
-      <Route path="/settings" component={WorkspaceSettingsPage} />
-      <Route path="/settings/profile" component={WorkspaceSettingsPage} />
-      <Route path="/settings/workspace" component={WorkspaceSettingsPage} />
-      <Route path="/settings/team" component={TeamSettingsPage} />
-      <Route path="/settings/extension" component={ExtensionSettingsPage} />
-      <Route path="/settings/ai" component={AiSettingsPage} />
+      {/* Dedicated Settings Route - Security & Access Control */}
+      <Route path="/settings" component={SecuritySettingsPage} />
       <Route path="/settings/security" component={SecuritySettingsPage} />
-      <Route path="/settings/billing" component={WorkspaceSettingsPage} />
+      <Route path="/settings/workspace" component={SecuritySettingsPage} />
+      <Route path="/settings/team" component={SecuritySettingsPage} />
+      <Route path="/settings/extension" component={SecuritySettingsPage} />
+      <Route path="/settings/ai" component={SecuritySettingsPage} />
+      <Route path="/settings/profile" component={SecuritySettingsPage} />
+      <Route path="/settings/billing" component={SecuritySettingsPage} />
 
       {/* Distinct Dedicated Integration Sub-Routes */}
       <Route path="/settings/integrations" component={IntegrationsHubPage} />

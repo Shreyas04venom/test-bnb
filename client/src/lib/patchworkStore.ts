@@ -23,13 +23,13 @@ import type {
 
 export const INITIAL_USER: User = {
   id: 'usr-owner-1',
-  name: 'Shreyas (Team Lead)',
-  email: 'shreyas@axon.dev',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+  name: 'Workspace Lead',
+  email: 'developer@axon.dev',
+  avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=Axon',
   role: 'owner',
   cursorColor: '#6366F1',
   timezone: 'UTC',
-  githubUsername: 'shreyas-axon',
+  githubUsername: undefined,
 };
 
 export const INITIAL_WORKSPACE: Workspace = {
@@ -192,20 +192,20 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
       extensionSessions: [],
       integrations: {
         github: {
-          connected: true,
-          org: 'axon-team',
+          connected: false,
+          org: '',
           accountType: 'organization',
-          appInstalled: true,
-          repositories: ['axon-repo'],
+          appInstalled: false,
+          repositories: [],
           permissions: ['repo', 'workflow'],
-          lastSync: new Date().toISOString(),
+          lastSync: '',
         },
         vercel: {
-          connected: true,
-          team: 'axon-prod',
-          projects: ['axon-app'],
-          domains: ['axon.dev'],
-          lastSync: new Date().toISOString(),
+          connected: false,
+          team: '',
+          projects: [],
+          domains: [],
+          lastSync: '',
         },
         netlify: {
           connected: false,
@@ -245,12 +245,22 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
             if (json.success && json.data) {
               const d = json.data;
               const curIntegrations = get().integrations;
+              const curUser = get().currentUser;
+              // If user is already authenticated via Clerk, keep their Clerk credentials
+              const isClerkAuth = Boolean(curUser?.clerkId || (curUser?.id && curUser.id.startsWith('user_')));
+              const resolvedUser = isClerkAuth ? curUser : (d.currentUser || curUser);
+
               set({
                 workspace: d.workspace ? { ...get().workspace, ...d.workspace } : get().workspace,
-                currentUser: d.currentUser || get().currentUser,
+                currentUser: resolvedUser,
                 projects: d.projects || [],
                 patches: d.patches || [],
-                members: d.collaborators || get().members,
+                members: (d.collaborators || get().members).map((m: WorkspaceMember) => {
+                  if ((m.role === 'owner' || m.id === 'mem-1') && resolvedUser) {
+                    return { ...m, userId: resolvedUser.id, user: resolvedUser };
+                  }
+                  return m;
+                }),
                 extensionSessions: d.extensionSessions || [],
                 deployments: d.deployments || [],
                 auditLogs: d.auditLogs || [],
@@ -397,7 +407,20 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
       },
 
       switchUser: (user: User) => {
-        set({ currentUser: user });
+        set((state) => ({
+          currentUser: user,
+          members: state.members.map((m) =>
+            m.role === 'owner' || m.id === 'mem-1'
+              ? { ...m, userId: user.id, user }
+              : m
+          ),
+        }));
+        // Persist Clerk profile immediately to server store
+        fetch('/api/user', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(user),
+        }).catch(() => {});
       },
 
       setActiveProject: (projectId: string) => {

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { usePatchworkStore } from '@/lib/patchworkStore';
+import { useUser } from '@clerk/clerk-react';
 import { GitHubIcon, VercelIcon, NetlifyIcon } from '@/components/BrandIcons';
 import {
   FolderGit2,
@@ -12,7 +13,8 @@ import {
   GitPullRequest,
   AlertCircle,
   ArrowUpRight,
-  GitBranch
+  GitBranch,
+  Loader2
 } from 'lucide-react';
 import {
   Dialog,
@@ -24,31 +26,107 @@ import {
 } from '@/components/ui/dialog';
 
 export default function ProjectsPage() {
-  const { projects, createProject, verifyProjectOwnership, patches, integrations } = usePatchworkStore();
+  const { user: clerkUser } = useUser();
+  const { projects, createProject, verifyProjectOwnership, patches, integrations, currentUser } = usePatchworkStore();
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
-  const isGitHubConnected = Boolean(integrations?.github?.connected);
-  const githubOrg = integrations?.github?.org || 'axon-team';
-  const githubRepos = integrations?.github?.repositories && integrations.github.repositories.length > 0
-    ? integrations.github.repositories
-    : ['axon-core', 'axon-studio', 'storefront-web', 'analytics-dashboard', 'auth-service'];
+  // Detect connected GitHub account from Clerk or store or localStorage (strictly per-user)
+  const clerkGithub = clerkUser?.externalAccounts?.find(
+    (acc: any) =>
+      acc.provider === 'github' ||
+      acc.provider === 'oauth_github' ||
+      acc.providerSlug === 'github' ||
+      (typeof acc.provider === 'string' && acc.provider.toLowerCase().includes('github'))
+  );
+
+  const detectedUsername =
+    (clerkGithub as any)?.username ||
+    (clerkGithub as any)?.label ||
+    (clerkGithub as any)?.externalUsername ||
+    (clerkUser?.username && !clerkUser.username.includes('@') ? clerkUser.username : '') ||
+    currentUser?.githubUsername ||
+    (typeof window !== 'undefined' ? localStorage.getItem('axon_github_username') || '' : '') ||
+    '';
+
+  const [activeGithubUsername, setActiveGithubUsername] = useState<string>(detectedUsername);
+  const [manualGithubInput, setManualGithubInput] = useState<string>('');
+  const [isChangingAccount, setIsChangingAccount] = useState<boolean>(false);
+
+  const [reposList, setReposList] = useState<Array<{ name: string; fullName: string; defaultBranch: string; htmlUrl: string; homepage?: string }>>([]);
+  const [loadingRepos, setLoadingRepos] = useState(false);
+  const [reposError, setReposError] = useState<string | null>(null);
+
+  // Keep active username in sync if Clerk loads later
+  useEffect(() => {
+    if (detectedUsername && !activeGithubUsername) {
+      setActiveGithubUsername(detectedUsername);
+    }
+  }, [detectedUsername, activeGithubUsername]);
+
+  const loadRepos = (usernameToFetch: string) => {
+    if (!usernameToFetch.trim()) return;
+    setLoadingRepos(true);
+    setReposError(null);
+    fetch(`/api/github/repos?username=${encodeURIComponent(usernameToFetch.trim())}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.repositories)) {
+          setReposList(data.repositories);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('axon_github_username', usernameToFetch.trim());
+          }
+        } else {
+          setReposList([]);
+          setReposError(data.message || 'No repositories found or rate-limited.');
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load GitHub repos:', err);
+        setReposError('Failed to load repositories from GitHub.');
+      })
+      .finally(() => setLoadingRepos(false));
+  };
+
+  useEffect(() => {
+    if (createModalOpen && activeGithubUsername) {
+      loadRepos(activeGithubUsername);
+    }
+  }, [createModalOpen, activeGithubUsername]);
+
+  const handleApplyCustomUsername = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = manualGithubInput.trim();
+    if (!trimmed) return;
+    setActiveGithubUsername(trimmed);
+    setIsChangingAccount(false);
+    loadRepos(trimmed);
+  };
 
   // New Project Form
   const [name, setName] = useState('');
   const [repoName, setRepoName] = useState('');
   const [framework, setFramework] = useState<'Next.js' | 'React (Vite)'>('Next.js');
   const [provider, setProvider] = useState<'vercel' | 'netlify'>('vercel');
-  const [productionUrl, setProductionUrl] = useState('https://app.example.com');
+  const [productionUrl, setProductionUrl] = useState('');
 
   const handleRepoSelect = (selectedFullName: string) => {
     setRepoName(selectedFullName);
-    const short = selectedFullName.includes('/') ? selectedFullName.split('/')[1] : selectedFullName;
+    const selected = reposList.find((r) => r.fullName === selectedFullName);
+    const short = selected ? selected.name : (selectedFullName.includes('/') ? selectedFullName.split('/')[1] : selectedFullName);
     const cleanName = short
       .split(/[-_]/)
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ');
     setName(cleanName);
-    setProductionUrl(`https://${short.toLowerCase()}.axon.dev`);
+
+    // Autofetch production URL if repository has a homepage configured
+    if (selected?.homepage && (selected.homepage.startsWith('http://') || selected.homepage.startsWith('https://'))) {
+      setProductionUrl(selected.homepage);
+    } else {
+      // Empty so user can type manually
+      setProductionUrl('');
+    }
+
     if (short.toLowerCase().includes('vite') || short.toLowerCase().includes('react')) {
       setFramework('React (Vite)');
     } else {
@@ -148,7 +226,15 @@ export default function ProjectsPage() {
                           : 'bg-amber-100 text-amber-800'
                       }`}
                     >
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Verified
+                      {project.ownershipStatus === 'verified' ? (
+                        <>
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Verified
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="w-3 h-3 text-amber-600" /> Pending
+                        </>
+                      )}
                     </span>
                   </div>
 
@@ -220,66 +306,108 @@ export default function ProjectsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          {!isGitHubConnected ? (
-            <div className="space-y-4 py-2">
-              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 space-y-2">
-                <div className="flex items-center gap-2 font-bold text-xs">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>GitHub Account Not Linked</span>
+          <form onSubmit={handleCreate} className="space-y-4 py-2">
+            {/* GitHub Account Selector / Switcher */}
+            {(!activeGithubUsername || isChangingAccount) ? (
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#1B133C] flex items-center gap-1.5">
+                    <GitHubIcon size={14} />
+                    <span>GitHub Account or Organization</span>
+                  </span>
+                  {activeGithubUsername && (
+                    <button
+                      type="button"
+                      onClick={() => setIsChangingAccount(false)}
+                      className="text-[11px] text-muted-foreground hover:text-black font-medium"
+                    >
+                      Cancel
+                    </button>
+                  )}
                 </div>
-                <p className="text-xs text-amber-800 leading-relaxed">
-                  Project repositories can only be selected from your connected GitHub account. Please connect your GitHub account first to browse and import your repositories.
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={manualGithubInput}
+                    onChange={(e) => setManualGithubInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleApplyCustomUsername();
+                      }
+                    }}
+                    placeholder="Enter your GitHub username (e.g. vivanshetty)"
+                    className="flex-1 px-3 py-2 rounded-xl border border-black/10 bg-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleApplyCustomUsername()}
+                    disabled={!manualGithubInput.trim() || loadingRepos}
+                    className="px-3.5 py-2 rounded-xl bg-[#1B133C] text-white hover:bg-black text-xs font-semibold disabled:opacity-50 transition-all"
+                  >
+                    {loadingRepos ? 'Loading...' : 'Load Repos'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Connect your personal GitHub account to load your repositories.
                 </p>
               </div>
-
-              <div className="pt-2 flex flex-col gap-2">
-                <Link
-                  href="/settings/integrations/github"
-                  className="w-full py-2.5 px-4 rounded-xl bg-[#1B133C] text-white hover:bg-black text-xs font-semibold flex items-center justify-center gap-2 shadow-xs transition-all"
-                >
-                  <GitHubIcon size={14} />
-                  <span>Connect GitHub in Settings</span>
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setCreateModalOpen(false)}
-                  className="w-full py-2 px-4 rounded-xl text-xs font-semibold text-muted-foreground hover:bg-black/5"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleCreate} className="space-y-4 py-2">
-              {/* GitHub Repository Dropdown */}
+            ) : (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-[#1B133C]">GitHub Repository</label>
-                  <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md font-medium flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                    GitHub Linked ({githubOrg})
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md font-mono font-medium flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      @{activeGithubUsername}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setManualGithubInput(activeGithubUsername);
+                        setIsChangingAccount(true);
+                      }}
+                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold underline underline-offset-2"
+                    >
+                      Switch Account
+                    </button>
+                  </div>
                 </div>
-                <select
-                  value={repoName}
-                  onChange={(e) => handleRepoSelect(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-black/10 bg-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  required
-                >
-                  <option value="" disabled>-- Select repository from your GitHub account --</option>
-                  {githubRepos.map((r) => {
-                    const full = r.includes('/') ? r : `${githubOrg}/${r}`;
-                    return (
-                      <option key={full} value={full}>
-                        {full} (branch: main)
+                <div className="relative">
+                  <select
+                    value={repoName}
+                    onChange={(e) => handleRepoSelect(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-black/10 bg-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-50"
+                    required
+                    disabled={loadingRepos || !activeGithubUsername}
+                  >
+                    <option value="" disabled>
+                      {loadingRepos
+                        ? `-- Fetching repositories for @${activeGithubUsername}... --`
+                        : reposList.length > 0
+                        ? '-- Select repository from your GitHub account --'
+                        : `-- No public repositories found for @${activeGithubUsername} --`}
+                    </option>
+                    {reposList.map((r) => (
+                      <option key={r.fullName} value={r.fullName}>
+                        {r.fullName} (branch: {r.defaultBranch || 'main'})
                       </option>
-                    );
-                  })}
-                </select>
+                    ))}
+                  </select>
+                  {loadingRepos && (
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground absolute right-3 top-3 pointer-events-none" />
+                  )}
+                </div>
+                {reposError && (
+                  <p className="text-[11px] text-rose-600 font-medium">
+                    {reposError}
+                  </p>
+                )}
                 <p className="text-[11px] text-muted-foreground">
-                  Select a repository from your linked GitHub account to configure visual live editing.
+                  Select a live repository to configure visual inspection.
                 </p>
               </div>
+            )}
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-[#1B133C]">Project Display Name</label>
@@ -320,14 +448,20 @@ export default function ProjectsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[#1B133C]">Production Website URL</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-[#1B133C]">Production Website URL</label>
+                  <span className="text-[10px] text-muted-foreground">Autofetched or enter manually</span>
+                </div>
                 <input
-                  type="url"
+                  type="text"
                   value={productionUrl}
                   onChange={(e) => setProductionUrl(e.target.value)}
+                  placeholder="https://your-domain.com (autofetched from repo or type manually)"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 bg-white text-xs font-mono focus:outline-none"
-                  required
                 />
+                <p className="text-[11px] text-muted-foreground">
+                  The live URL where the Axon Chrome Extension will inject the Visual DOM Inspector.
+                </p>
               </div>
 
               <DialogFooter className="pt-2">
@@ -347,7 +481,6 @@ export default function ProjectsPage() {
                 </button>
               </DialogFooter>
             </form>
-          )}
         </DialogContent>
       </Dialog>
     </DashboardLayout>

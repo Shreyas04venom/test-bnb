@@ -24,6 +24,7 @@ import {
   recordPresence,
   getActivePresence,
 } from './store';
+import { syncGitCommitToSupabase, syncWorkspaceToSupabase, syncAuditLogToSupabase } from './supabase';
 
 export const patchworkApiRouter = Router();
 
@@ -54,6 +55,7 @@ function pushAudit(
     ...(details.patchId ? { patchId: details.patchId } : {}),
   };
   store.auditLogs.unshift(entry);
+  syncAuditLogToSupabase(entry).catch(() => {});
 }
 
 function createMockVerification(patchId: string, projectId = 'proj-1'): VerificationRun {
@@ -155,6 +157,71 @@ patchworkApiRouter.post('/auth/logout', (_req: Request, res: Response) => {
 });
 
 // ==========================================
+// USER PROFILE API (/api/user) - CLERK AUTH SYNC
+// ==========================================
+patchworkApiRouter.get('/user', (_req: Request, res: Response) => {
+  const store = getStore();
+  res.json({ success: true, user: store.currentUser });
+});
+
+patchworkApiRouter.patch('/user', (req: Request, res: Response) => {
+  const store = getStore();
+  const { id, clerkId, name, email, avatar, role, githubUsername, cursorColor, timezone } = req.body;
+  const resolvedId = id || clerkId || store.currentUser.id;
+  const resolvedName = name || store.currentUser.name;
+  const resolvedEmail = email || store.currentUser.email;
+
+  store.currentUser = {
+    ...store.currentUser,
+    id: resolvedId,
+    clerkId: clerkId || id || store.currentUser.clerkId,
+    name: resolvedName,
+    email: resolvedEmail,
+    avatar: avatar || store.currentUser.avatar,
+    role: role || store.currentUser.role,
+    githubUsername: githubUsername !== undefined ? githubUsername : store.currentUser.githubUsername,
+    cursorColor: cursorColor || store.currentUser.cursorColor,
+    timezone: timezone || store.currentUser.timezone,
+  };
+
+  if (resolvedId) {
+    store.workspace.ownerId = resolvedId;
+  }
+
+  // Update primary collaborator / owner
+  const ownerIndex = store.collaborators.findIndex((c) => c.role === 'owner' || c.id === 'mem-1');
+  if (ownerIndex >= 0) {
+    store.collaborators[ownerIndex] = {
+      ...store.collaborators[ownerIndex],
+      userId: resolvedId,
+      user: store.currentUser,
+    };
+  }
+
+  saveStore();
+  res.json({ success: true, user: store.currentUser });
+});
+
+// ==========================================
+// WORKSPACE API (/api/workspace)
+// ==========================================
+patchworkApiRouter.get('/workspace', (_req: Request, res: Response) => {
+  const store = getStore();
+  res.json({ success: true, workspace: store.workspace });
+});
+
+patchworkApiRouter.patch('/workspace', (req: Request, res: Response) => {
+  const store = getStore();
+  const { name, slug, setupCompleted } = req.body;
+  if (name) store.workspace.name = name;
+  if (slug) store.workspace.slug = slug;
+  if (setupCompleted !== undefined) store.workspace.setupCompleted = Boolean(setupCompleted);
+  saveStore();
+  syncWorkspaceToSupabase(store.workspace).catch(() => {});
+  res.json({ success: true, workspace: store.workspace });
+});
+
+// ==========================================
 // 2. PROJECTS API (/api/projects)
 // ==========================================
 patchworkApiRouter.get('/projects', (_req: Request, res: Response) => {
@@ -171,11 +238,76 @@ patchworkApiRouter.get('/projects/:id', (req: Request, res: Response) => {
   res.json({ success: true, project });
 });
 
+// ==========================================
+// GITHUB REPOSITORIES API (/api/github/repos)
+// ==========================================
+patchworkApiRouter.get('/github/repos', async (req: Request, res: Response) => {
+  const store = getStore();
+  const username =
+    (req.query.username as string)?.trim() ||
+    store.currentUser.githubUsername?.trim() ||
+    (store.integrations.github.org !== 'axon-team' && store.integrations.github.org ? store.integrations.github.org.trim() : undefined);
+  const token =
+    (req.query.token as string)?.trim() ||
+    (store.integrations.github as any).token ||
+    process.env.GITHUB_TOKEN;
+
+  if (!username && !token) {
+    return res.json({
+      success: false,
+      message: 'No GitHub username linked. Please enter your GitHub username.',
+      repositories: [],
+    });
+  }
+
+  try {
+    const headers: Record<string, string> = {
+      'User-Agent': 'Axon-Studio-App',
+      Accept: 'application/vnd.github.v3+json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const url = token
+      ? 'https://api.github.com/user/repos?sort=updated&per_page=100'
+      : `https://api.github.com/users/${encodeURIComponent(username || '')}/repos?sort=updated&per_page=100`;
+
+    const ghRes = await fetch(url, { headers });
+    if (!ghRes.ok) {
+      const errText = await ghRes.text();
+      console.warn(`[GitHub API] Failed to fetch repos (${ghRes.status}):`, errText);
+      return res.json({ success: true, repositories: [], error: `GitHub API returned ${ghRes.status}` });
+    }
+
+    const data = await ghRes.json();
+    if (!Array.isArray(data)) {
+      return res.json({ success: true, repositories: [] });
+    }
+
+    const repositories = data.map((r: any) => ({
+      name: r.name,
+      fullName: r.full_name,
+      defaultBranch: r.default_branch || 'main',
+      htmlUrl: r.html_url,
+      homepage: r.homepage || '',
+      description: r.description || '',
+      language: r.language || '',
+      isPrivate: Boolean(r.private),
+    }));
+
+    res.json({ success: true, repositories, username });
+  } catch (err: any) {
+    console.error('[GitHub API] Error:', err);
+    res.json({ success: true, repositories: [], error: err.message });
+  }
+});
+
 patchworkApiRouter.post('/projects', (req: Request, res: Response) => {
   const schema = z.object({
     name: z.string().min(1),
     slug: z.string().min(1),
-    productionUrl: z.string().url(),
+    productionUrl: z.string().optional().default(''),
     framework: z.string(),
     repositoryName: z.string(),
     deploymentProvider: z.enum(['vercel', 'netlify', 'custom']),
@@ -186,13 +318,18 @@ patchworkApiRouter.post('/projects', (req: Request, res: Response) => {
     return res.status(400).json({ success: false, error: parsed.error.format() });
   }
 
+  let finalUrl = parsed.data.productionUrl || '';
+  if (finalUrl && !finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+    finalUrl = `https://${finalUrl}`;
+  }
+
   const store = getStore();
   const newProject: Project = {
     id: `proj-${Date.now()}`,
     workspaceId: store.workspace.id,
     name: parsed.data.name,
     slug: parsed.data.slug,
-    productionUrl: parsed.data.productionUrl,
+    productionUrl: finalUrl,
     framework: parsed.data.framework as any,
     repositoryId: `repo-${Date.now()}`,
     repositoryName: parsed.data.repositoryName,
@@ -470,33 +607,48 @@ patchworkApiRouter.post('/collaborators/invite', (req: Request, res: Response) =
   const colors = ['#6366F1', '#EC4899', '#10B981', '#F59E0B', '#3B82F6', '#8B5CF6'];
   const assignedColor = cursorColor || colors[store.collaborators.length % colors.length];
 
-  const newMember: WorkspaceMember = {
-    id: `mem-${Date.now()}`,
-    workspaceId: store.workspace.id,
-    userId: `usr-${Date.now()}`,
-    user: {
-      id: `usr-${Date.now()}`,
-      name: name || email.split('@')[0],
-      email,
-      avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${name || email}`,
-      role: role || 'developer',
-      cursorColor: assignedColor,
-      timezone: 'UTC',
-    },
-    role: role || 'developer',
-    joinedAt: new Date().toISOString(),
-    status: 'active',
-  };
+  const existingIndex = store.collaborators.findIndex(
+    (c) => c.user.email?.toLowerCase().trim() === email.toLowerCase().trim()
+  );
 
-  store.collaborators.push(newMember);
+  let memberToReturn: WorkspaceMember;
+
+  if (existingIndex >= 0) {
+    store.collaborators[existingIndex].role = role || store.collaborators[existingIndex].role;
+    if (name) {
+      store.collaborators[existingIndex].user.name = name;
+    }
+    memberToReturn = store.collaborators[existingIndex];
+  } else {
+    const newMember: WorkspaceMember = {
+      id: `mem-${Date.now()}`,
+      workspaceId: store.workspace.id,
+      userId: `usr-${Date.now()}`,
+      user: {
+        id: `usr-${Date.now()}`,
+        name: name || email.split('@')[0],
+        email,
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || email)}`,
+        role: role || 'developer',
+        cursorColor: assignedColor,
+        timezone: 'UTC',
+      },
+      role: role || 'developer',
+      joinedAt: new Date().toISOString(),
+      status: 'active',
+    };
+    store.collaborators.push(newMember);
+    memberToReturn = newMember;
+  }
+
   store.workspace.membersCount = store.collaborators.length;
 
   pushAudit('COLLABORATOR_INVITED', {
-    metadata: { email, role: newMember.role },
+    metadata: { email, role: memberToReturn.role },
   }, req);
 
   saveStore();
-  res.status(201).json({ success: true, member: newMember });
+  res.json({ success: true, member: memberToReturn });
 });
 
 patchworkApiRouter.patch('/collaborators/:id', (req: Request, res: Response) => {
@@ -906,6 +1058,17 @@ patchworkApiRouter.post('/extension/commit', (req: Request, res: Response) => {
   }, req);
 
   saveStore();
+
+  syncGitCommitToSupabase({
+    commitSha,
+    branch: finalBranch,
+    message: commitMessage || patch.title,
+    author: store.currentUser.name || store.currentUser.email,
+    filesChanged: stagedFiles.length,
+    versionTag,
+    projectId: project.id,
+    workspaceId: store.workspace.id,
+  }).catch(() => {});
 
   const pipelineSteps = [
     `git add -A (${stagedFiles.length} modified rules staged)`,

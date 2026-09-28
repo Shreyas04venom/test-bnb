@@ -1,14 +1,10 @@
 import React, { useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { SettingsNav } from '@/components/SettingsNav';
 import { usePatchworkStore } from '@/lib/patchworkStore';
 import { useUser, useClerk } from '@clerk/clerk-react';
 import { GitHubIcon, VercelIcon } from '@/components/BrandIcons';
 import {
   ShieldCheck,
-  Lock,
-  KeyRound,
-  FileCheck2,
   AlertCircle,
   CheckCircle2,
   ExternalLink,
@@ -23,20 +19,61 @@ import {
 import { toast } from 'sonner';
 
 export default function SecuritySettingsPage() {
-  const { auditLogs, currentUser } = usePatchworkStore();
+  const { auditLogs, currentUser, integrations, updateIntegrations } = usePatchworkStore();
   const { user, isLoaded, isSignedIn } = useUser();
   const clerk = useClerk();
   const [copiedId, setCopiedId] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isConnectingGithub, setIsConnectingGithub] = useState(false);
+  const [isConnectingVercel, setIsConnectingVercel] = useState(false);
+
+  const clerkGithubAccount = user?.externalAccounts?.find(
+    (acc: any) =>
+      acc.provider === 'github' ||
+      acc.provider === 'oauth_github' ||
+      acc.providerSlug === 'github' ||
+      (typeof acc.provider === 'string' && acc.provider.toLowerCase().includes('github'))
+  );
+  const clerkVercelAccount = user?.externalAccounts?.find(
+    (acc: any) =>
+      acc.provider === 'vercel' ||
+      acc.provider === 'oauth_vercel' ||
+      acc.providerSlug === 'vercel' ||
+      (typeof acc.provider === 'string' && acc.provider.toLowerCase().includes('vercel'))
+  );
+
+  const githubUsername =
+    (clerkGithubAccount as any)?.username ||
+    (clerkGithubAccount as any)?.label ||
+    (clerkGithubAccount as any)?.externalUsername ||
+    (user?.username && !user.username.includes('@') ? user.username : undefined) ||
+    currentUser?.githubUsername ||
+    (typeof window !== 'undefined' ? localStorage.getItem('axon_github_username') || '' : '') ||
+    '';
+
+  // Dynamic status: Only true if actually linked in Clerk OR explicitly connected with account details
+  const isGithubConnected = Boolean(
+    clerkGithubAccount ||
+    githubUsername ||
+    (integrations?.github?.connected && (currentUser?.githubUsername || integrations?.github?.org))
+  );
+
+  const isVercelConnected = Boolean(
+    clerkVercelAccount ||
+    (integrations?.vercel?.connected && Boolean(integrations?.vercel?.team))
+  );
+
+  const vercelIdentity =
+    (clerkVercelAccount as any)?.username ||
+    integrations?.vercel?.team ||
+    '';
 
   const displayUser = {
     name: user?.fullName || currentUser?.name || 'Workspace Lead',
     email: user?.primaryEmailAddress?.emailAddress || currentUser?.email || 'developer@axon.dev',
     avatar: user?.imageUrl || currentUser?.avatar || 'https://api.dicebear.com/7.x/initials/svg?seed=Axon',
     id: user?.id || currentUser?.clerkId || currentUser?.id || 'usr_clerk_verified_production',
-    emailVerified: user?.primaryEmailAddress?.verification?.status === 'verified' || true,
-    githubConnected: true,
-    vercelConnected: true,
+    emailVerified: user?.primaryEmailAddress?.verification?.status === 'verified',
   };
 
   const copyUserId = () => {
@@ -62,52 +99,100 @@ export default function SecuritySettingsPage() {
     }, 600);
   };
 
+  const handleConnectGithub = async () => {
+    setIsConnectingGithub(true);
+    try {
+      if (user) {
+        try {
+          const externalAccount = await user.createExternalAccount({
+            strategy: 'oauth_github',
+            redirectUrl: window.location.href,
+          });
+          const redirectUrl = externalAccount?.verification?.externalVerificationRedirectURL;
+          if (redirectUrl) {
+            window.location.href = redirectUrl.toString();
+            return;
+          }
+        } catch (e) {
+          console.log('Clerk direct createExternalAccount returned:', e);
+        }
+      }
+      if (clerk && clerk.openUserProfile) {
+        clerk.openUserProfile();
+        toast.info('Connect GitHub under "Connected accounts" in your Clerk profile.');
+      } else {
+        window.location.href = '/settings/integrations/github';
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not initiate GitHub connection');
+    } finally {
+      setIsConnectingGithub(false);
+    }
+  };
+
+  const handleConnectVercel = async () => {
+    setIsConnectingVercel(true);
+    try {
+      if (user) {
+        try {
+          const externalAccount = await user.createExternalAccount({
+            strategy: 'oauth_vercel' as any,
+            redirectUrl: window.location.href,
+          });
+          const redirectUrl = externalAccount?.verification?.externalVerificationRedirectURL;
+          if (redirectUrl) {
+            window.location.href = redirectUrl.toString();
+            return;
+          }
+        } catch (e) {
+          console.log('Clerk direct Vercel createExternalAccount:', e);
+        }
+      }
+      if (clerk && clerk.openUserProfile) {
+        clerk.openUserProfile();
+        toast.info('Connect Vercel under "Connected accounts" in your Clerk profile.');
+      } else {
+        window.location.href = '/settings/integrations/vercel';
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not initiate Vercel connection');
+    } finally {
+      setIsConnectingVercel(false);
+    }
+  };
+
+  const handleDisconnectGithub = () => {
+    updateIntegrations((prev) => ({
+      ...prev,
+      github: {
+        ...prev.github,
+        connected: false,
+        org: '',
+        repositories: [],
+      },
+    }));
+    toast.success('GitHub disconnected from workspace.');
+  };
+
+  const handleDisconnectVercel = () => {
+    updateIntegrations((prev) => ({
+      ...prev,
+      vercel: {
+        ...prev.vercel,
+        connected: false,
+        team: '',
+        projects: [],
+      },
+    }));
+    toast.success('Vercel disconnected from workspace.');
+  };
+
   return (
     <DashboardLayout
       title="Security & Access Control"
-      subtitle="Clerk enterprise authentication, verified identity, connected OAuth providers, and audit trails."
+      subtitle="Clerk enterprise authentication, verified identity, connected OAuth providers, and access governance."
     >
       <div className="space-y-6 max-w-4xl">
-        <SettingsNav currentTab="security & audit" />
-
-        {/* Security Overview Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="glass-card p-5 border border-white/80 space-y-1">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="font-semibold uppercase tracking-wider">Clerk Auth</span>
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            </div>
-            <p className="text-xl font-bold text-[#1B133C]">Verified Active</p>
-            <p className="text-[11px] text-emerald-700">Enterprise SSO & SOC2 Type II</p>
-          </div>
-
-          <div className="glass-card p-5 border border-white/80 space-y-1">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="font-semibold uppercase tracking-wider">Credential Encryption</span>
-              <Lock className="w-4 h-4 text-emerald-600" />
-            </div>
-            <p className="text-xl font-bold text-[#1B133C]">AES-256-GCM</p>
-            <p className="text-[11px] text-emerald-700">Hardware KMS at rest</p>
-          </div>
-
-          <div className="glass-card p-5 border border-white/80 space-y-1">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="font-semibold uppercase tracking-wider">Extension Auth</span>
-              <KeyRound className="w-4 h-4 text-indigo-600" />
-            </div>
-            <p className="text-xl font-bold text-[#1B133C]">ECDSA Ephemeral</p>
-            <p className="text-[11px] text-indigo-700">Zero plain keys in browser</p>
-          </div>
-
-          <div className="glass-card p-5 border border-white/80 space-y-1">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="font-semibold uppercase tracking-wider">Audit Compliance</span>
-              <FileCheck2 className="w-4 h-4 text-purple-600" />
-            </div>
-            <p className="text-xl font-bold text-[#1B133C]">SOC2 Compliant</p>
-            <p className="text-[11px] text-purple-700">Immutable ledger enabled</p>
-          </div>
-        </div>
 
         {/* Clerk Verified Authentication Card */}
         <div className="glass-card p-6 md:p-8 border border-white/80 space-y-6">
@@ -203,36 +288,72 @@ export default function SecuritySettingsPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h4 className="font-bold text-sm text-[#1B133C]">GitHub (Authorized in Clerk Auth)</h4>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                      <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
-                      OAuth SSO Active
-                    </span>
+                    {isGithubConnected ? (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                        OAuth SSO Active
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                        <AlertCircle className="w-2.5 h-2.5 text-amber-600" />
+                        Not Connected
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Identity linked: <span className="font-mono text-[#1B133C] font-medium">{currentUser?.githubUsername || 'github-authorized'}</span> • Scopes: <span className="font-mono text-[11px]">read:user, repo, workflow, write:packages</span>
-                  </p>
-                  <p className="text-[11px] text-emerald-700 mt-1">
-                    ✓ Permitted in Clerk settings to dispatch pull requests and read repository trees.
-                  </p>
+
+                  {isGithubConnected ? (
+                    <>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Identity linked: <span className="font-mono text-[#1B133C] font-semibold">{githubUsername}</span> • Scopes: <span className="font-mono text-[11px]">read:user, repo, workflow, write:packages</span>
+                      </p>
+                      <p className="text-[11px] text-emerald-700 mt-1">
+                        ✓ Permitted in Clerk settings to dispatch pull requests and read repository trees.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Identity linked: <span className="font-mono text-muted-foreground italic">No account linked</span> • Scopes: <span className="font-mono text-[11px] text-muted-foreground">None authorized</span>
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Connect your GitHub account to sync repositories, create pull requests, and manage versions.
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => handleReverifyAuth('GitHub')}
-                  disabled={isVerifying}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/10 bg-white hover:bg-slate-50 text-xs font-semibold text-[#1B133C] transition-all shadow-2xs"
-                >
-                  <RefreshCw className={`w-3 h-3 ${isVerifying ? 'animate-spin' : ''}`} />
-                  <span>Verify Scope</span>
-                </button>
-                <button
-                  onClick={handleOpenClerkProfile}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-black text-white hover:bg-slate-800 text-xs font-semibold transition-all shadow-2xs"
-                >
-                  <span>Manage in Clerk</span>
-                  <ExternalLink className="w-3 h-3 ml-0.5" />
-                </button>
+                {isGithubConnected ? (
+                  <>
+                    <button
+                      onClick={() => handleReverifyAuth('GitHub')}
+                      disabled={isVerifying}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/10 bg-white hover:bg-slate-50 text-xs font-semibold text-[#1B133C] transition-all shadow-2xs"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isVerifying ? 'animate-spin' : ''}`} />
+                      <span>Verify Scope</span>
+                    </button>
+                    <button
+                      onClick={handleDisconnectGithub}
+                      className="text-xs text-rose-600 hover:text-rose-700 font-medium px-2 py-1 transition-colors"
+                      title="Disconnect GitHub"
+                    >
+                      Disconnect
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleConnectGithub}
+                      disabled={isConnectingGithub}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-black text-white hover:bg-slate-800 text-xs font-semibold transition-all shadow-xs"
+                    >
+                      <GitHubIcon className="w-3.5 h-3.5 fill-white" />
+                      <span>Connect GitHub</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -245,60 +366,73 @@ export default function SecuritySettingsPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h4 className="font-bold text-sm text-[#1B133C]">Vercel (Authorized in Clerk Auth)</h4>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                      <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
-                      OAuth SSO Active
-                    </span>
+                    {isVercelConnected ? (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                        OAuth SSO Active
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                        <AlertCircle className="w-2.5 h-2.5 text-amber-600" />
+                        Not Connected
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Identity linked: <span className="font-mono text-[#1B133C] font-medium">team-axon-vercel</span> • Scopes: <span className="font-mono text-[11px]">deployments, projects:read, webhooks:write</span>
-                  </p>
-                  <p className="text-[11px] text-emerald-700 mt-1">
-                    ✓ Permitted in Clerk settings to trigger zero-downtime previews and verify deployment webhooks.
-                  </p>
+
+                  {isVercelConnected ? (
+                    <>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Identity linked: <span className="font-mono text-[#1B133C] font-semibold">{vercelIdentity}</span> • Scopes: <span className="font-mono text-[11px]">deployments, projects:read, webhooks:write</span>
+                      </p>
+                      <p className="text-[11px] text-emerald-700 mt-1">
+                        ✓ Permitted in Clerk settings to trigger zero-downtime previews and verify deployment webhooks.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Identity linked: <span className="font-mono text-muted-foreground italic">No account linked</span> • Scopes: <span className="font-mono text-[11px] text-muted-foreground">None authorized</span>
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Connect your Vercel account to enable live preview deployments and production rollouts.
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => handleReverifyAuth('Vercel')}
-                  disabled={isVerifying}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/10 bg-white hover:bg-slate-50 text-xs font-semibold text-[#1B133C] transition-all shadow-2xs"
-                >
-                  <RefreshCw className={`w-3 h-3 ${isVerifying ? 'animate-spin' : ''}`} />
-                  <span>Verify Scope</span>
-                </button>
-                <button
-                  onClick={handleOpenClerkProfile}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-black text-white hover:bg-slate-800 text-xs font-semibold transition-all shadow-2xs"
-                >
-                  <span>Manage in Clerk</span>
-                  <ExternalLink className="w-3 h-3 ml-0.5" />
-                </button>
+                {isVercelConnected ? (
+                  <>
+                    <button
+                      onClick={() => handleReverifyAuth('Vercel')}
+                      disabled={isVerifying}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/10 bg-white hover:bg-slate-50 text-xs font-semibold text-[#1B133C] transition-all shadow-2xs"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isVerifying ? 'animate-spin' : ''}`} />
+                      <span>Verify Scope</span>
+                    </button>
+                    <button
+                      onClick={handleDisconnectVercel}
+                      className="text-xs text-rose-600 hover:text-rose-700 font-medium px-2 py-1 transition-colors"
+                      title="Disconnect Vercel"
+                    >
+                      Disconnect
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleConnectVercel}
+                      disabled={isConnectingVercel}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-black text-white hover:bg-slate-800 text-xs font-semibold transition-all shadow-xs"
+                    >
+                      <VercelIcon className="w-3.5 h-3.5 fill-white" />
+                      <span>Connect Vercel</span>
+                    </button>
+                  </>
+                )}
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Webhook Signatures */}
-        <div className="glass-card p-6 md:p-8 border border-white/80 space-y-6">
-          <div className="flex items-center gap-3 pb-4 border-b border-black/5">
-            <div className="w-10 h-10 rounded-xl bg-slate-100 text-[#1B133C] flex items-center justify-center">
-              <KeyRound className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base text-[#1B133C]">Webhook Signing Secret</h3>
-              <p className="text-xs text-muted-foreground">Verify payload authenticity for inbound GitHub, Vercel, and Netlify events.</p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-[#1B133C]">Active Signing Secret</label>
-            <div className="flex items-center justify-between p-3.5 rounded-xl border border-black/10 bg-black/[0.02]">
-              <span className="font-mono text-xs text-muted-foreground">whsec_9a87f8b2c4e10d5f6a8e0b4c2d...</span>
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                Active & Enforced
-              </span>
             </div>
           </div>
         </div>

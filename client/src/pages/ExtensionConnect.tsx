@@ -16,9 +16,11 @@ import {
   Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useUser } from '@clerk/clerk-react';
 
 export default function ExtensionConnectPage() {
   const [, setLocation] = useLocation();
+  const { user: clerkUser } = useUser();
   const {
     currentUser,
     workspace,
@@ -260,7 +262,7 @@ export default function ExtensionConnectPage() {
           <div>
             <span className="text-[10px] text-muted-foreground uppercase font-semibold">Authorizing Workspace</span>
             <p className="font-bold text-[#1B133C] text-sm mt-0.5">{workspace.name}</p>
-            <p className="text-muted-foreground">{currentUser?.email || 'shreyas@axon.dev'}</p>
+            <p className="text-muted-foreground">{clerkUser?.primaryEmailAddress?.emailAddress || currentUser?.email || 'developer@axon.dev'}</p>
           </div>
           <span className="w-8 h-8 rounded-lg bg-[#1B133C] text-white flex items-center justify-center font-bold text-xs">
             {workspace.name.substring(0, 1)}

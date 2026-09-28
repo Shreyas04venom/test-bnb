@@ -80,7 +80,17 @@ export default function AuditLogsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/5">
-                {filteredLogs.map((log) => (
+                {filteredLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-muted-foreground">
+                      <div className="space-y-1">
+                        <p className="font-semibold text-sm text-[#1B133C]">No Audit Events Yet</p>
+                        <p className="text-xs">Security, extension pairing, commits, and deployment events will appear here in realtime.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-black/[0.02] transition-colors">
                     <td className="py-3 px-4 text-muted-foreground font-mono">
                       {new Date(log.timestamp).toLocaleString([], {
@@ -113,7 +123,7 @@ export default function AuditLogsPage() {
                       </span>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>

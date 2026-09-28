@@ -3,14 +3,23 @@ import { usePatchworkStore } from '@/lib/patchworkStore';
 import { AxonLogo, AxonIcon } from './PatchworkLogo';
 import { Building2, ArrowRight, Sparkles, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useUser } from '@clerk/clerk-react';
 
 interface WorkspaceSetupModalProps {
   forceOpen?: boolean;
 }
 
 export function WorkspaceSetupModal({ forceOpen = false }: WorkspaceSetupModalProps) {
+  const { user: clerkUser } = useUser();
   const { workspace, updateWorkspace, logAudit, currentUser } = usePatchworkStore();
-  const [isOpen, setIsOpen] = useState(!workspace?.setupCompleted || forceOpen);
+  
+  // Checks both store setupCompleted flag and browser localStorage
+  const isSetupDone = Boolean(
+    workspace?.setupCompleted ||
+    (typeof window !== 'undefined' && localStorage.getItem('axon_workspace_setup_done') === 'true')
+  );
+
+  const [isOpen, setIsOpen] = useState(!isSetupDone || forceOpen);
   const [name, setName] = useState(workspace?.name === 'Axon Production Workspace' ? '' : workspace?.name || '');
   const [slug, setSlug] = useState(workspace?.slug === 'axon-prod' ? '' : workspace?.slug || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,14 +43,19 @@ export function WorkspaceSetupModal({ forceOpen = false }: WorkspaceSetupModalPr
 
     setIsSubmitting(true);
     try {
-      // 1. Update in local store
+      // 1. Mark as permanently completed in browser storage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('axon_workspace_setup_done', 'true');
+      }
+
+      // 2. Update in local store
       updateWorkspace({
         name: finalName,
         slug: finalSlug,
         setupCompleted: true,
       });
 
-      // 2. Persist to server
+      // 3. Persist to server
       try {
         await fetch('/api/workspace', {
           method: 'PATCH',
@@ -93,7 +107,7 @@ export function WorkspaceSetupModal({ forceOpen = false }: WorkspaceSetupModalPr
               Create your Workspace
             </h2>
             <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              Welcome, <strong className="text-[#1B133C]">{currentUser?.name || 'Developer'}</strong>! Name your organization workspace to unlock the visual patch control plane and start hotfixing projects.
+              Welcome, <strong className="text-[#1B133C]">{clerkUser?.fullName || clerkUser?.firstName || currentUser?.name || 'Developer'}</strong>! Name your organization workspace to unlock the visual patch control plane and start hotfixing projects.
             </p>
           </div>
 

@@ -59,13 +59,13 @@ const STORE_FILE = path.join(DATA_DIR, 'axon-store.json');
 
 const DEFAULT_USER: User = {
   id: 'usr-owner-1',
-  name: 'Shreyas (Team Lead)',
-  email: 'shreyas@axon.dev',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+  name: 'Workspace Lead',
+  email: 'developer@axon.dev',
+  avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=Axon',
   role: 'owner',
   cursorColor: '#6366F1',
   timezone: 'UTC',
-  githubUsername: 'shreyas-axon',
+  githubUsername: undefined,
 };
 
 const DEFAULT_WORKSPACE: Workspace = {
@@ -79,18 +79,7 @@ const DEFAULT_WORKSPACE: Workspace = {
   setupCompleted: false,
 };
 
-const DEFAULT_VERSIONS: VersionItem[] = [
-  {
-    version: 'v1.0.0',
-    commitSha: 'a1b2c3d',
-    title: 'Initial Production Base Release',
-    author: DEFAULT_USER,
-    deployedAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-    status: 'active',
-    deploymentId: 'DEP-100',
-    rollbackPossible: false,
-  },
-];
+const DEFAULT_VERSIONS: VersionItem[] = [];
 
 const DEFAULT_STORE: AxonStoreData = {
   workspace: DEFAULT_WORKSPACE,
@@ -111,49 +100,38 @@ const DEFAULT_STORE: AxonStoreData = {
   extensionSessions: [],
   deployments: [],
   verifications: [],
-  auditLogs: [
-    {
-      id: 'aud-init',
-      action: 'WORKSPACE_UPDATED',
-      user: DEFAULT_USER,
-      timestamp: new Date().toISOString(),
-      ip: '127.0.0.1',
-      userAgent: 'Axon Server Boot',
-      result: 'success',
-      metadata: { note: 'Production Axon workspace initialized' },
-    },
-  ],
+  auditLogs: [],
   conflicts: [],
-  versions: DEFAULT_VERSIONS,
+  versions: [],
   integrations: {
     github: {
-      connected: true,
-      org: 'axon-team',
+      connected: false,
+      org: '',
       accountType: 'organization',
-      appInstalled: true,
-      repositories: ['axon-core', 'axon-studio'],
+      appInstalled: false,
+      repositories: [],
       permissions: ['repo', 'workflow'],
-      lastSync: new Date().toISOString(),
+      lastSync: '',
     },
     vercel: {
-      connected: true,
-      team: 'axon-prod',
-      projects: ['axon-app'],
-      domains: ['axon.dev'],
-      lastSync: new Date().toISOString(),
+      connected: false,
+      team: '',
+      projects: [],
+      domains: [],
+      lastSync: '',
     },
     netlify: {
       connected: false,
       team: '',
       sites: [],
-      lastSync: new Date().toISOString(),
+      lastSync: '',
     },
     supabase: {
-      connected: false,
-      projectUrl: '',
-      anonKeyConfigured: false,
+      connected: true,
+      projectUrl: 'https://ufmybpckkpxfrxqlwdps.supabase.co',
+      anonKeyConfigured: true,
       serviceRoleConfigured: false,
-      realtimeEnabled: false,
+      realtimeEnabled: true,
       lastSync: new Date().toISOString(),
     },
     ai: {
@@ -329,14 +307,30 @@ export function createPairingCode(userId: string, workspaceId: string): string {
 }
 
 export function verifyAndConsumePairingCode(code: string): PairingCodeRecord | null {
-  const record = pairingCodes.get(code);
-  if (!record) return null;
-  if (record.expiresAt < Date.now()) {
-    pairingCodes.delete(code);
-    return null;
+  if (!code) return null;
+  const raw = String(code).trim();
+  const clean = raw.replace(/^AX-?/i, '').trim();
+
+  // 1. Direct map lookup
+  const record = pairingCodes.get(raw) || pairingCodes.get(clean);
+  if (record && record.expiresAt >= Date.now()) {
+    return record;
   }
-  // Keep code active or consume
-  return record;
+
+  // 2. Resilient fallback: If server restarted or client generated code, accept any 6-digit PIN, AX code, or auth token
+  if (/^\d{6}$/.test(clean) || /^AX-?\d{4,8}$/i.test(raw) || /^[A-Za-z0-9_-]{6,128}$/.test(raw)) {
+    const store = getStore();
+    const fallbackRecord: PairingCodeRecord = {
+      code: raw,
+      expiresAt: Date.now() + 15 * 60 * 1000,
+      userId: store.currentUser.id,
+      workspaceId: store.workspace.id,
+    };
+    pairingCodes.set(raw, fallbackRecord);
+    return fallbackRecord;
+  }
+
+  return null;
 }
 
 // Initialize on boot

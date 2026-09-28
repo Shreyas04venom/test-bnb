@@ -41,8 +41,21 @@ export default function VersionsPage() {
             <span className="text-xs text-muted-foreground">{versions.length} Releases Recorded</span>
           </div>
 
-          <div className="relative border-l-2 border-indigo-200 ml-4 pl-6 space-y-8">
-            {versions.map((ver, idx) => (
+          {versions.length === 0 ? (
+            <div className="p-12 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center mx-auto">
+                <History className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-base font-bold text-[#1B133C]">No Versions Recorded Yet</h4>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  When you pair the Axon extension and commit or deploy visual changes to your Git repository, live releases and commit SHAs will be recorded here automatically.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="relative border-l-2 border-indigo-200 ml-4 pl-6 space-y-8">
+              {versions.map((ver, idx) => (
               <div key={ver.version} className="relative group">
                 {/* Timeline node */}
                 <span
@@ -94,6 +107,7 @@ export default function VersionsPage() {
               </div>
             ))}
           </div>
+        )}
         </div>
       </div>
     </DashboardLayout>

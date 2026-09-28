@@ -76,14 +76,6 @@ export default function DashboardPage() {
               <Plus className="w-3.5 h-3.5" />
               <span>Create Project</span>
             </Link>
-            <button
-              onClick={() => seedStarterProject()}
-              disabled={isLoading}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-black/10 bg-white text-[#1B133C] text-xs font-semibold shadow-2xs hover:bg-slate-50 transition-all disabled:opacity-50"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Load Starter Project</span>
-            </button>
           </div>
         )
       }

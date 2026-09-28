@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useLocation, Link } from 'wouter';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { usePatchworkStore, SEED_MEMBERS } from '@/lib/patchworkStore';
+import { usePatchworkStore } from '@/lib/patchworkStore';
+import { useUser, useClerk } from '@clerk/clerk-react';
 import {
   Settings,
   User,
@@ -25,6 +26,8 @@ import {
 
 export default function SettingsPage() {
   const [location, setLocation] = useLocation();
+  const clerk = useClerk();
+  const { isSignedIn, user: clerkUser } = useUser();
   const {
     currentUser,
     workspace,
@@ -640,18 +643,54 @@ export default function SettingsPage() {
 
         {/* TAB 6: PROFILE */}
         {activeTab === 'profile' && (
-          <div className="glass-card p-6 border border-white/80 space-y-4">
-            <h3 className="text-base font-bold text-[#1B133C]">Profile Details</h3>
+          <div className="glass-card p-6 border border-white/80 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-black/5">
+              <div>
+                <h3 className="text-base font-bold text-[#1B133C]">Profile Details</h3>
+                <p className="text-xs text-muted-foreground">Authorized identity managed via Clerk SSO Authentication.</p>
+              </div>
+              {isSignedIn && (
+                <button
+                  onClick={() => clerk.openUserProfile?.()}
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-all flex items-center gap-1.5 shadow-2xs"
+                >
+                  <User className="w-3.5 h-3.5" />
+                  Manage Clerk Account
+                </button>
+              )}
+            </div>
+
             <div className="flex items-center gap-4">
               <img
-                src={currentUser?.avatar || SEED_MEMBERS[0].user.avatar}
-                alt={currentUser?.name}
-                className="w-16 h-16 rounded-full object-cover ring-2 ring-black/10"
+                src={
+                  clerkUser?.imageUrl ||
+                  currentUser?.avatar ||
+                  `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+                    clerkUser?.fullName || currentUser?.name || 'Axon User'
+                  )}`
+                }
+                alt={clerkUser?.fullName || currentUser?.name}
+                className="w-16 h-16 rounded-full object-cover ring-2 ring-indigo-200 shadow-xs"
               />
-              <div>
-                <p className="text-base font-bold text-[#1B133C]">{currentUser?.name}</p>
-                <p className="text-xs text-muted-foreground">{currentUser?.email}</p>
-                <p className="text-xs text-indigo-600 mt-1">Role: {currentUser?.role}</p>
+              <div className="space-y-1">
+                <p className="text-base font-bold text-[#1B133C]">
+                  {clerkUser?.fullName ||
+                    [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(' ') ||
+                    clerkUser?.username ||
+                    currentUser?.name ||
+                    'Axon User'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {clerkUser?.primaryEmailAddress?.emailAddress || currentUser?.email}
+                </p>
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Clerk Authenticated ✓
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    ID: {clerkUser?.id || currentUser?.id}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

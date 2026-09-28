@@ -3,64 +3,63 @@
     "id": "ws-prod-1",
     "name": "Axon Production Workspace",
     "slug": "axon-prod",
-    "ownerId": "usr-owner-1",
+    "ownerId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
     "plan": "Enterprise",
-    "membersCount": 1,
+    "membersCount": 3,
     "createdAt": "2026-09-28T13:42:47.195Z",
-    "setupCompleted": false
+    "setupCompleted": true
   },
   "currentUser": {
-    "id": "usr-owner-1",
-    "name": "Shreyas (Team Lead)",
-    "email": "shreyas@axon.dev",
-    "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    "id": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
+    "name": "tapu",
+    "email": "tapu3983@gmail.com",
+    "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZvUWpSN2JwSXBWdDc1aUV4UjRIcmVRT04ifQ",
     "role": "owner",
     "cursorColor": "#6366F1",
-    "timezone": "UTC",
-    "githubUsername": "shreyas-axon"
+    "timezone": "Asia/Calcutta",
+    "clerkId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh"
   },
   "projects": [
     {
-      "id": "proj-1790603117822",
+      "id": "proj-1790615624295",
       "workspaceId": "ws-prod-1",
-      "name": "Axon Production App",
-      "slug": "axon-production-app",
-      "productionUrl": "http://localhost:3000",
-      "framework": "React (Vite)",
-      "repositoryId": "repo-1790603117822",
-      "repositoryName": "axon-org/production-app",
-      "repositoryUrl": "https://github.com/axon-org/production-app",
+      "name": "Silence Classroom",
+      "slug": "silence-classroom",
+      "productionUrl": "https://silence-classroom.agnidev.me",
+      "framework": "Next.js",
+      "repositoryId": "repo-1790615624295",
+      "repositoryName": "Shreyas04venom/silence-classroom",
+      "repositoryUrl": "https://github.com/Shreyas04venom/silence-classroom",
       "deploymentProvider": "vercel",
-      "deploymentProjectId": "prj_axon_1790603117822",
+      "deploymentProjectId": "deploy_prj_1790615624295",
       "defaultBranch": "main",
       "status": "production_healthy",
       "ownershipStatus": "verified",
-      "verifiedAt": "2026-09-28T13:45:17.822Z",
-      "createdAt": "2026-09-28T13:45:17.822Z",
-      "updatedAt": "2026-09-28T13:45:17.822Z"
+      "verifiedAt": "2026-09-28T17:13:44.297Z",
+      "createdAt": "2026-09-28T17:13:44.298Z",
+      "updatedAt": "2026-09-28T17:13:44.298Z"
     }
   ],
   "patches": [
     {
       "id": "PW-101",
-      "projectId": "proj-1790603117822",
+      "projectId": "proj-live",
       "workspaceId": "ws-prod-1",
       "author": {
         "id": "usr-owner-1",
-        "name": "Shreyas (Team Lead)",
-        "email": "shreyas@axon.dev",
-        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "name": "Workspace Lead",
+        "email": "developer@axon.dev",
+        "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=Axon",
         "role": "owner",
         "cursorColor": "#6366F1",
-        "timezone": "UTC",
-        "githubUsername": "shreyas-axon"
+        "timezone": "UTC"
       },
-      "title": "feat: responsive nav style hotfix",
-      "description": "Git commit 841ff84 dispatched from Axon Chrome Extension directly to main",
+      "title": "feat(visual): style overrides applied via Axon Chrome Extension",
+      "description": "Git commit 4ccab97 dispatched from Axon Chrome Extension directly to main",
       "status": "DEPLOYED",
       "riskLevel": "LOW",
       "branchName": "main",
-      "commitSha": "841ff84",
+      "commitSha": "4ccab97",
       "previewUrl": "http://localhost:3000",
       "files": [
         {
@@ -69,14 +68,16 @@
           "changeType": "modified",
           "additions": 14,
           "deletions": 2,
-          "diffSummary": "Committed visual DOM styling and token overrides via Axon Extension"
+          "diffSummary": "Applied production visual style overrides",
+          "oldContent": "/* production base styles */",
+          "newContent": "/* axon live hotfix overrides */"
         }
       ],
       "comments": [],
       "reviews": [],
       "source": "extension",
-      "createdAt": "2026-09-28T14:13:47.895Z",
-      "updatedAt": "2026-09-28T14:13:47.895Z",
+      "createdAt": "2026-09-28T17:00:35.785Z",
+      "updatedAt": "2026-09-28T17:00:35.785Z",
       "aiSummary": {
         "explanation": "Staged and committed 1 visual AST changes directly into Git branch main.",
         "why": "Immediate visual production hotfix applied via Axon Visual Inspector.",
@@ -97,228 +98,193 @@
     {
       "id": "mem-1",
       "workspaceId": "ws-prod-1",
-      "userId": "usr-owner-1",
+      "userId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
       "user": {
-        "id": "usr-owner-1",
-        "name": "Shreyas (Team Lead)",
-        "email": "shreyas@axon.dev",
-        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "id": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
+        "name": "tapu",
+        "email": "tapu3983@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZvUWpSN2JwSXBWdDc1aUV4UjRIcmVRT04ifQ",
         "role": "owner",
         "cursorColor": "#6366F1",
-        "timezone": "UTC",
-        "githubUsername": "shreyas-axon"
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh"
       },
       "role": "owner",
       "joinedAt": "2026-09-28T13:42:47.234Z",
+      "status": "active"
+    },
+    {
+      "id": "mem-1790610102787",
+      "workspaceId": "ws-prod-1",
+      "userId": "usr-1790610102788",
+      "user": {
+        "id": "usr-1790610102788",
+        "name": "Vivan Shetty",
+        "email": "vivanshetty45@gmail.com",
+        "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=Vivan%20Shetty",
+        "role": "developer",
+        "cursorColor": "#EC4899",
+        "timezone": "UTC"
+      },
+      "role": "developer",
+      "joinedAt": "2026-09-28T15:41:42.788Z",
+      "status": "active"
+    },
+    {
+      "id": "mem-1790610637744",
+      "workspaceId": "ws-prod-1",
+      "userId": "usr-1790610637745",
+      "user": {
+        "id": "usr-1790610637745",
+        "name": "akshat churi",
+        "email": "akshatchuri699@gmail.com",
+        "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=akshat%20churi",
+        "role": "viewer",
+        "cursorColor": "#10B981",
+        "timezone": "UTC"
+      },
+      "role": "viewer",
+      "joinedAt": "2026-09-28T15:50:37.745Z",
       "status": "active"
     }
   ],
   "extensionSessions": [],
   "deployments": [
     {
-      "id": "DEP-620",
-      "projectId": "proj-1790603117822",
+      "id": "DEP-720",
+      "projectId": "proj-live",
       "patchId": "PW-101",
       "environment": "production",
       "provider": "vercel",
-      "commitSha": "841ff84",
+      "commitSha": "4ccab97",
       "branch": "main",
       "author": {
         "id": "usr-owner-1",
-        "name": "Shreyas (Team Lead)",
-        "email": "shreyas@axon.dev",
-        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "name": "Workspace Lead",
+        "email": "developer@axon.dev",
+        "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=Axon",
         "role": "owner",
         "cursorColor": "#6366F1",
-        "timezone": "UTC",
-        "githubUsername": "shreyas-axon"
+        "timezone": "UTC"
       },
       "status": "READY",
       "previewUrl": "http://localhost:3000",
       "durationSeconds": 19,
-      "createdAt": "2026-09-28T14:13:47.897Z"
+      "createdAt": "2026-09-28T17:00:35.798Z"
     }
   ],
   "verifications": [],
   "auditLogs": [
     {
-      "id": "aud-1790604879506-x5cd",
-      "action": "ROLLBACK_TRIGGERED",
+      "id": "aud-1790615624298-fve0",
+      "action": "PROJECT_CREATED",
       "user": {
-        "id": "usr-owner-1",
-        "name": "Shreyas (Team Lead)",
-        "email": "shreyas@axon.dev",
-        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "id": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
+        "name": "tapu",
+        "email": "tapu3983@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZvUWpSN2JwSXBWdDc1aUV4UjRIcmVRT04ifQ",
         "role": "owner",
         "cursorColor": "#6366F1",
-        "timezone": "UTC",
-        "githubUsername": "shreyas-axon"
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh"
       },
-      "timestamp": "2026-09-28T14:14:39.506Z",
+      "timestamp": "2026-09-28T17:13:44.298Z",
       "ip": "127.0.0.1",
-      "userAgent": "node",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36 Edg/154.0.0.0",
       "result": "success",
       "metadata": {
-        "targetVersion": "v1.0.0",
-        "rollbackVersion": "v1.3.0",
-        "reason": "Testing rollback mechanism",
-        "revertSha": "c0a38ae"
-      }
+        "repo": "Shreyas04venom/silence-classroom",
+        "url": "https://silence-classroom.agnidev.me"
+      },
+      "projectId": "proj-1790615624295",
+      "projectName": "Silence Classroom"
     },
     {
-      "id": "aud-1790604827899-5h9k",
+      "id": "aud-1790614835813-jlrw",
       "action": "DEPLOYMENT_COMPLETED",
       "user": {
         "id": "usr-owner-1",
-        "name": "Shreyas (Team Lead)",
-        "email": "shreyas@axon.dev",
-        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "name": "Workspace Lead",
+        "email": "developer@axon.dev",
+        "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=Axon",
         "role": "owner",
         "cursorColor": "#6366F1",
-        "timezone": "UTC",
-        "githubUsername": "shreyas-axon"
+        "timezone": "UTC"
       },
-      "timestamp": "2026-09-28T14:13:47.900Z",
+      "timestamp": "2026-09-28T17:00:35.813Z",
       "ip": "127.0.0.1",
-      "userAgent": "node",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
       "result": "success",
       "metadata": {
-        "commitSha": "841ff84",
+        "commitSha": "4ccab97",
         "branch": "main",
-        "version": "v1.2.0",
-        "commitMessage": "feat: responsive nav style hotfix",
+        "version": "v1.1.0",
+        "commitMessage": "feat(visual): style overrides applied via Axon Chrome Extension",
         "gitPipeline": [
           "git add .",
-          "git commit -m \"feat: responsive nav style hotfix\"",
+          "git commit -m \"feat(visual): style overrides applied via Axon Chrome Extension\"",
           "git push origin main"
         ]
       },
-      "projectId": "proj-1790603117822",
+      "projectId": "proj-live",
       "patchId": "PW-101"
-    },
-    {
-      "id": "aud-init",
-      "action": "WORKSPACE_UPDATED",
-      "user": {
-        "id": "usr-owner-1",
-        "name": "Shreyas (Team Lead)",
-        "email": "shreyas@axon.dev",
-        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-        "role": "owner",
-        "cursorColor": "#6366F1",
-        "timezone": "UTC",
-        "githubUsername": "shreyas-axon"
-      },
-      "timestamp": "2026-09-28T13:42:47.234Z",
-      "ip": "127.0.0.1",
-      "userAgent": "Axon Server Boot",
-      "result": "success",
-      "metadata": {
-        "note": "Production Axon workspace initialized"
-      }
     }
   ],
   "conflicts": [],
   "versions": [
     {
-      "version": "v1.3.0",
-      "commitSha": "c0a38ae",
-      "title": "Safe Revert to Initial Production Base Release (v1.0.0)",
-      "author": {
-        "id": "usr-owner-1",
-        "name": "Shreyas (Team Lead)",
-        "email": "shreyas@axon.dev",
-        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-        "role": "owner",
-        "cursorColor": "#6366F1",
-        "timezone": "UTC",
-        "githubUsername": "shreyas-axon"
-      },
-      "deployedAt": "2026-09-28T14:14:39.505Z",
-      "status": "active",
-      "deploymentId": "DEP-199",
-      "rollbackPossible": true
-    },
-    {
-      "version": "v1.2.0",
-      "commitSha": "841ff84",
+      "version": "v1.1.0",
+      "commitSha": "4ccab97",
       "patchId": "PW-101",
-      "title": "feat: responsive nav style hotfix",
+      "title": "feat(visual): style overrides applied via Axon Chrome Extension",
       "author": {
         "id": "usr-owner-1",
-        "name": "Shreyas (Team Lead)",
-        "email": "shreyas@axon.dev",
-        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "name": "Workspace Lead",
+        "email": "developer@axon.dev",
+        "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=Axon",
         "role": "owner",
         "cursorColor": "#6366F1",
-        "timezone": "UTC",
-        "githubUsername": "shreyas-axon"
+        "timezone": "UTC"
       },
-      "deployedAt": "2026-09-28T14:13:47.897Z",
-      "status": "reverted",
-      "deploymentId": "DEP-620",
+      "deployedAt": "2026-09-28T17:00:35.785Z",
+      "status": "active",
+      "deploymentId": "DEP-720",
       "rollbackPossible": true
-    },
-    {
-      "version": "v1.0.0",
-      "commitSha": "a1b2c3d",
-      "title": "Initial Production Base Release",
-      "author": {
-        "id": "usr-owner-1",
-        "name": "Shreyas (Team Lead)",
-        "email": "shreyas@axon.dev",
-        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-        "role": "owner",
-        "cursorColor": "#6366F1",
-        "timezone": "UTC",
-        "githubUsername": "shreyas-axon"
-      },
-      "deployedAt": "2026-09-26T13:59:11.329Z",
-      "status": "superseded",
-      "deploymentId": "DEP-100",
-      "rollbackPossible": false
     }
   ],
   "integrations": {
     "github": {
-      "connected": true,
-      "org": "axon-team",
-      "accountType": "organization",
-      "appInstalled": true,
-      "repositories": [
-        "axon-core",
-        "axon-studio"
-      ],
+      "connected": false,
+      "org": "",
+      "accountType": "user",
+      "appInstalled": false,
+      "repositories": [],
       "permissions": [
         "repo",
         "workflow"
       ],
-      "lastSync": "2026-09-28T13:42:47.234Z"
+      "lastSync": "2026-09-28T16:00:00.000Z"
     },
     "vercel": {
-      "connected": true,
-      "team": "axon-prod",
-      "projects": [
-        "axon-app"
-      ],
-      "domains": [
-        "axon.dev"
-      ],
-      "lastSync": "2026-09-28T13:42:47.234Z"
+      "connected": false,
+      "team": "",
+      "projects": [],
+      "domains": [],
+      "lastSync": ""
     },
     "netlify": {
       "connected": false,
       "team": "",
       "sites": [],
-      "lastSync": "2026-09-28T13:42:47.234Z"
+      "lastSync": ""
     },
     "supabase": {
-      "connected": false,
-      "projectUrl": "",
-      "anonKeyConfigured": false,
+      "connected": true,
+      "projectUrl": "https://ufmybpckkpxfrxqlwdps.supabase.co",
+      "anonKeyConfigured": true,
       "serviceRoleConfigured": false,
-      "realtimeEnabled": false,
-      "lastSync": "2026-09-28T13:42:47.234Z"
+      "realtimeEnabled": true,
+      "lastSync": "2026-09-28T16:00:00.000Z"
     },
     "ai": {
       "provider": "gemini",

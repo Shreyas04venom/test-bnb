@@ -19,8 +19,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { useUser } from '@clerk/clerk-react';
 
 export default function TeamSettingsPage() {
+  const { user: clerkUser } = useUser();
   const { members, currentUser, switchUser, logAudit } = usePatchworkStore();
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -68,26 +70,46 @@ export default function TeamSettingsPage() {
           </div>
 
           <div className="divide-y divide-black/5">
-            {members.map((member) => {
-              const isSelf = member.userId === currentUser?.id;
+            {(() => {
+              const uniqueMembers = members.filter((m, idx, arr) => {
+                const email = m.user.email?.toLowerCase().trim();
+                return arr.findIndex((x) => (email && x.user.email?.toLowerCase().trim() === email) || x.userId === m.userId) === idx;
+              });
+
+              return uniqueMembers.map((member) => {
+                const isSelf = Boolean(
+                  (currentUser?.id && member.userId === currentUser.id) ||
+                  (currentUser?.email && member.user.email?.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
+                  (clerkUser?.primaryEmailAddress?.emailAddress && member.user.email?.toLowerCase().trim() === clerkUser.primaryEmailAddress.emailAddress.toLowerCase().trim())
+                );
+                const displayName = (isSelf && (clerkUser?.fullName || clerkUser?.firstName))
+                  ? (clerkUser.fullName || clerkUser.firstName || '')
+                  : (isSelf && currentUser?.name ? currentUser.name : member.user.name);
+                const displayEmail = (isSelf && clerkUser?.primaryEmailAddress?.emailAddress)
+                  ? clerkUser.primaryEmailAddress.emailAddress
+                  : (isSelf && currentUser?.email ? currentUser.email : (member.user.email || ''));
+                const displayAvatar = (isSelf && clerkUser?.imageUrl)
+                  ? clerkUser.imageUrl
+                  : (isSelf && currentUser?.avatar ? currentUser.avatar : (member.user.avatar || ''));
+
               return (
                 <div key={member.userId} className="py-4 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3.5">
                     <img
-                      src={member.user.avatar}
-                      alt={member.user.name}
+                      src={displayAvatar}
+                      alt={displayName || 'Member Avatar'}
                       className="w-10 h-10 rounded-full object-cover ring-1 ring-black/10"
                     />
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-[#1B133C]">{member.user.name}</span>
+                        <span className="font-bold text-sm text-[#1B133C]">{displayName}</span>
                         {isSelf && (
-                          <span className="text-[10px] bg-black/5 px-2 py-0.5 rounded font-medium text-muted-foreground">
-                            You
+                          <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded font-semibold">
+                            You (Clerk)
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">{member.user.email}</p>
+                      <p className="text-xs text-muted-foreground">{displayEmail}</p>
                     </div>
                   </div>
 
@@ -113,7 +135,8 @@ export default function TeamSettingsPage() {
                   </div>
                 </div>
               );
-            })}
+            });
+          })()}
           </div>
         </div>
 
