@@ -7,7 +7,6 @@ import { publicPlatformScript } from "./publicConfig";
 import { appRouter } from "../routers";
 import { patchworkApiRouter } from "../patchworkApi";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
 
 export function createServerApp() {
   const app = express();
@@ -35,6 +34,7 @@ export function createServerApp() {
 export const app = createServerApp();
 
 async function startServer() {
+  const { serveStatic, setupVite } = await import("./vite");
   const server = createServer(app);
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
