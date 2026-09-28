@@ -16,16 +16,20 @@ import {
 } from 'lucide-react';
 
 export default function GitHubIntegrationPage() {
-  const { integrations, updateIntegrations, logAudit } = usePatchworkStore();
+  const { integrations, updateIntegrations, logAudit, projects: storeProjects, patches } = usePatchworkStore();
   const [isSyncing, setIsSyncing] = useState(false);
   const [connected, setConnected] = useState(integrations.github.connected);
 
-  const repos = [
-    { name: 'company/shopwave-web', defaultBranch: 'main', patchesCount: 4, active: true },
-    { name: 'company/curacommerce-app', defaultBranch: 'production', patchesCount: 2, active: true },
-    { name: 'company/landinglab-site', defaultBranch: 'main', patchesCount: 1, active: true },
-    { name: 'company/docs-portal', defaultBranch: 'main', patchesCount: 0, active: false },
-  ];
+  const repos = storeProjects.length > 0
+    ? storeProjects.map((p) => ({
+        name: p.repositoryName,
+        defaultBranch: p.defaultBranch,
+        patchesCount: patches.filter((pt) => pt.projectId === p.id).length,
+        active: true,
+      }))
+    : [
+        { name: 'organization/production-repo', defaultBranch: 'main', patchesCount: 0, active: true },
+      ];
 
   const handleSync = () => {
     setIsSyncing(true);

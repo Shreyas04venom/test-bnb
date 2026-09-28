@@ -21,14 +21,14 @@ export default function ExtensionSuccessPage() {
           </h2>
 
           <p className="text-xs text-[#1B133C]/70 leading-relaxed">
-            Your Chrome extension is now linked with workspace <strong>AgniDev</strong>. You can now open any deployed project URL and start making visual modifications.
+            Your Chrome extension is now linked with your active workspace. You can now open any deployed project URL and start making visual modifications.
           </p>
 
           <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-200 text-xs text-indigo-950 text-left space-y-2">
             <span className="font-bold block">Next steps in your workflow:</span>
             <p className="text-[11px] leading-relaxed">
-              1. Open your live website (e.g., <span className="font-mono">https://shopwave.dev</span>)<br />
-              2. Click the PATCHWORK extension icon in Chrome<br />
+              1. Open your live website (e.g. your production web app)<br />
+              2. Click the Axon extension icon in Chrome<br />
               3. Select any DOM element to edit visual styles or prompt AI<br />
               4. Submit the patch to review and deploy here on the control plane.
             </p>

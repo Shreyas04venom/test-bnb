@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'wouter';
+import { SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
 import {
   Sparkles,
   GitPullRequest,
@@ -82,19 +83,32 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            <Link
-              href="/login"
-              className="px-3.5 py-1.5 text-xs font-medium text-[#1B133C] hover:text-black transition-colors"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/onboarding"
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#1B133C] px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-900 transition-all hover:scale-[1.02]"
-            >
-              <span>Get Started</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+            <SignedOut>
+              <Link
+                href="/login"
+                className="px-3.5 py-1.5 text-xs font-medium text-[#1B133C] hover:text-black transition-colors"
+              >
+                Log in
+              </Link>
+              <Link
+                href="/signup"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#1B133C] px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-900 transition-all hover:scale-[1.02]"
+              >
+                <span>Get Started</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </SignedOut>
+
+            <SignedIn>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#1B133C] px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-900 transition-all"
+              >
+                <span>Dashboard</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <UserButton afterSignOutUrl="/" />
+            </SignedIn>
           </div>
         </nav>
       </header>
@@ -122,13 +136,24 @@ export default function Home() {
 
         {/* Hero CTAs */}
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3.5">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 rounded-xl bg-[#1B133C] px-7 py-3.5 text-sm font-semibold text-white shadow-md hover:bg-black transition-all hover:shadow-lg hover:-translate-y-0.5"
-          >
-            <span>Open Dashboard</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+          <SignedOut>
+            <Link
+              href="/signup"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#1B133C] px-7 py-3.5 text-sm font-semibold text-white shadow-md hover:bg-black transition-all hover:shadow-lg hover:-translate-y-0.5"
+            >
+              <span>Get Started Free</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </SignedOut>
+          <SignedIn>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#1B133C] px-7 py-3.5 text-sm font-semibold text-white shadow-md hover:bg-black transition-all hover:shadow-lg hover:-translate-y-0.5"
+            >
+              <span>Open Dashboard</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </SignedIn>
           <a
             href="#how-it-works"
             className="inline-flex items-center gap-2 rounded-xl border border-black/15 bg-white/70 px-6 py-3.5 text-sm font-semibold text-[#1B133C] shadow-2xs backdrop-blur-md hover:bg-white transition-all"
@@ -163,7 +188,7 @@ export default function Home() {
               <span className="w-3 h-3 rounded-full bg-amber-400" />
               <span className="w-3 h-3 rounded-full bg-emerald-400" />
               <span className="ml-3 text-xs font-mono text-muted-foreground hidden sm:inline">
-                patchwork.dev/patches/PW-104
+                axon.dev/patches/preview
               </span>
             </div>
 
@@ -227,7 +252,7 @@ export default function Home() {
                   <div className="p-4 rounded-xl border border-black/10 bg-slate-50/70">
                     <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
                       <span className="font-semibold uppercase tracking-wider">Production Baseline</span>
-                      <span className="text-[10px] font-mono">v1.3 • shopwave.dev</span>
+                      <span className="text-[10px] font-mono">v1.3 • live-storefront.com</span>
                     </div>
                     <div className="p-6 bg-white rounded-lg border border-slate-200 text-center space-y-3">
                       <span className="text-xs text-slate-500 uppercase tracking-widest">New Release</span>
@@ -265,7 +290,7 @@ export default function Home() {
                     <span>Author: <strong>Shreyas</strong></span>
                     <span>Review: <strong>Arnav (Approved ✓)</strong></span>
                   </div>
-                  <Link href="/patches/PW-104" className="text-indigo-600 font-semibold hover:underline flex items-center gap-1">
+                  <Link href="/patches" className="text-indigo-600 font-semibold hover:underline flex items-center gap-1">
                     Open Patch Studio <ChevronRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
@@ -323,7 +348,7 @@ export default function Home() {
               <div className="space-y-3 text-xs">
                 <div className="flex items-center justify-between font-semibold">
                   <span>Git Timeline & Deployment Pipeline</span>
-                  <span className="text-muted-foreground">Branch: patchwork/PW-104-hero-cta</span>
+                  <span className="text-muted-foreground">Branch: axon/hero-cta-hotfix</span>
                 </div>
                 <div className="space-y-2">
                   <div className="p-2.5 rounded-lg border border-black/10 bg-white flex items-center justify-between">
@@ -331,7 +356,7 @@ export default function Home() {
                       <Rocket className="w-4 h-4 text-indigo-600" />
                       <div>
                         <p className="font-semibold text-[#1B133C]">DEP-89 Preview Live</p>
-                        <p className="text-[10px] text-muted-foreground font-mono">shopwave-git-patchwork-pw-104.vercel.app</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">store-git-axon-preview.vercel.app</p>
                       </div>
                     </div>
                     <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">
@@ -580,10 +605,10 @@ export default function Home() {
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5">
             <Link
-              href="/onboarding"
+              href="/signup"
               className="inline-flex items-center gap-2 rounded-xl bg-[#1B133C] px-8 py-3.5 text-sm font-semibold text-white shadow-md hover:bg-black transition-all hover:scale-[1.02]"
             >
-              <span>Get Started with PATCHWORK</span>
+              <span>Get Started with Axon</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link

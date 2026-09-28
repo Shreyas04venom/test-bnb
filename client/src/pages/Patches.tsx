@@ -65,13 +65,23 @@ export default function PatchesPage() {
       title="Patches Studio"
       subtitle="Review, verify, and promote visual git patches before production deployment."
       actions={
-        <Link
-          href="/patches/PW-104"
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold shadow-xs hover:bg-black transition-all"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Active Patch PW-104</span>
-        </Link>
+        patches.length > 0 ? (
+          <Link
+            href={`/patches/${patches[0].id}`}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold shadow-xs hover:bg-black transition-all"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Active Patch ({patches[0].id})</span>
+          </Link>
+        ) : (
+          <Link
+            href="/extension-connect"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold shadow-xs hover:bg-indigo-700 transition-all"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Stage Patch in Extension</span>
+          </Link>
+        )
       }
     >
       <div className="space-y-6">
@@ -135,7 +145,7 @@ export default function PatchesPage() {
                         {patch.title}
                       </Link>
                       <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-black/5 text-[#1B133C]/70">
-                        {project?.name || 'ShopWave'}
+                        {project?.name || 'Production Site'}
                       </span>
                     </div>
 

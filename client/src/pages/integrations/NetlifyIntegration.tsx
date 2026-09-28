@@ -13,14 +13,20 @@ import {
 } from 'lucide-react';
 
 export default function NetlifyIntegrationPage() {
-  const { integrations, updateIntegrations, logAudit } = usePatchworkStore();
+  const { integrations, updateIntegrations, logAudit, projects: storeProjects } = usePatchworkStore();
   const [isSyncing, setIsSyncing] = useState(false);
   const [connected, setConnected] = useState(integrations.netlify.connected);
 
-  const sites = [
-    { name: 'shopwave-marketing', domain: 'shopwave.netlify.app', buildHook: 'Active', status: 'ready' },
-    { name: 'developer-docs', domain: 'patchwork-docs.netlify.app', buildHook: 'Active', status: 'ready' },
-  ];
+  const sites = storeProjects.length > 0
+    ? storeProjects.map((p) => ({
+        name: p.slug || p.name.toLowerCase(),
+        domain: `${p.slug || 'app'}.netlify.app`,
+        buildHook: 'Active',
+        status: 'ready' as const,
+      }))
+    : [
+        { name: 'production-marketing', domain: 'production.netlify.app', buildHook: 'Active', status: 'ready' as const },
+      ];
 
   const handleSync = () => {
     setIsSyncing(true);

@@ -104,8 +104,11 @@ export default function ExtensionSettingsPage() {
               <h3 className="font-bold text-base text-[#1B133C]">Active Extension Sessions ({extensionSessions.length})</h3>
               <p className="text-xs text-muted-foreground">Browsers authorized to submit visual patches to this workspace.</p>
             </div>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5" /> 1 Session Active
+            <span className={`text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5 ${
+              extensionSessions.length > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+            }`}>
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {extensionSessions.length} Session{extensionSessions.length === 1 ? '' : 's'} Active
             </span>
           </div>
 
@@ -113,6 +116,12 @@ export default function ExtensionSettingsPage() {
             <div className="py-8 text-center text-xs text-muted-foreground space-y-3">
               <Laptop className="w-8 h-8 mx-auto text-black/20" />
               <p>No browser extension sessions are currently connected.</p>
+              <Link
+                href="/extension/connect"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold shadow-xs hover:bg-black transition-all"
+              >
+                <span>Pair Axon Extension</span>
+              </Link>
             </div>
           ) : (
             <div className="divide-y divide-black/5">
@@ -124,11 +133,13 @@ export default function ExtensionSettingsPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-[#1B133C]">{session.deviceInfo}</span>
-                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="font-bold text-sm text-[#1B133C]">
+                          {session.deviceName || session.deviceInfo || 'Chrome Browser'}
+                        </span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                       </div>
                       <p className="text-xs text-muted-foreground font-mono">
-                        Version {session.version} • IP: {session.ipAddress} • Last active {new Date(session.lastActiveAt).toLocaleTimeString()}
+                        Browser: {session.browser || 'Chrome 129'} • Last active: {session.lastActiveAt || 'Just now'} • Token: {session.tokenHash}
                       </p>
                     </div>
                   </div>
@@ -139,16 +150,32 @@ export default function ExtensionSettingsPage() {
                         revokeExtensionSession(session.id);
                         logAudit('EXTENSION_REVOKED', { metadata: { sessionId: session.id } });
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-semibold transition-all"
+                      className="px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-medium flex items-center gap-1.5 transition-all"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      <span>Revoke Session</span>
+                      <span>Revoke Access</span>
                     </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+
+        {/* Load Unpacked Installation Guide */}
+        <div className="glass-card p-6 md:p-8 border border-white/80 space-y-4">
+          <div className="flex items-center gap-2.5">
+            <Puzzle className="w-5 h-5 text-indigo-600" />
+            <h4 className="font-bold text-sm text-[#1B133C]">How to Load Axon Extension in Chrome</h4>
+          </div>
+          <ol className="list-decimal list-inside space-y-2 text-xs text-[#1B133C]/80 leading-relaxed pl-1">
+            <li>Open Chrome and navigate to <code className="px-1.5 py-0.5 rounded bg-black/5 font-mono text-[11px]">chrome://extensions</code></li>
+            <li>Enable <strong>Developer mode</strong> using the toggle switch in the top-right corner.</li>
+            <li>Click <strong>Load unpacked</strong> button in the top-left toolbar.</li>
+            <li>Select the folder: <code className="px-1.5 py-0.5 rounded bg-black/5 font-mono text-[11px]">axon/extension</code> (or <code className="px-1.5 py-0.5 rounded bg-black/5 font-mono text-[11px]">Downloads/extension</code>).</li>
+            <li>Open the Axon sidepanel by clicking the extension icon or pressing <code className="px-1.5 py-0.5 rounded bg-black/5 font-mono text-[11px]">Alt+D</code>.</li>
+            <li>Click <strong>Pair with Axon</strong> and enter your 6-digit PIN to start collaborating live!</li>
+          </ol>
         </div>
       </div>
     </DashboardLayout>

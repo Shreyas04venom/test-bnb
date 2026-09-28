@@ -55,10 +55,17 @@ export function CommandPalette() {
 
         {/* Quick Navigation Commands */}
         <CommandGroup heading="Actions & Tools">
-          <CommandItem onSelect={() => navigate('/patches/PW-104')}>
-            <Sparkles className="mr-2 h-4 w-4 text-indigo-600" />
-            <span>Open Active Patch PW-104 (Hero CTA)</span>
-          </CommandItem>
+          {patches[0] ? (
+            <CommandItem onSelect={() => navigate(`/patches/${patches[0].id}`)}>
+              <Sparkles className="mr-2 h-4 w-4 text-indigo-600" />
+              <span>Open Active Patch {patches[0].id} ({patches[0].title})</span>
+            </CommandItem>
+          ) : (
+            <CommandItem onSelect={() => navigate('/patches')}>
+              <Sparkles className="mr-2 h-4 w-4 text-indigo-600" />
+              <span>Explore Visual Patches Studio</span>
+            </CommandItem>
+          )}
           <CommandItem onSelect={() => navigate('/patches')}>
             <PlusCircle className="mr-2 h-4 w-4 text-emerald-600" />
             <span>Create / View All Patches</span>
@@ -75,9 +82,9 @@ export function CommandPalette() {
             <RotateCcw className="mr-2 h-4 w-4 text-rose-600" />
             <span>Instant Rollback Control Plane</span>
           </CommandItem>
-          <CommandItem onSelect={() => navigate('/extension/connect')}>
+          <CommandItem onSelect={() => navigate('/extension-connect')}>
             <Puzzle className="mr-2 h-4 w-4 text-purple-600" />
-            <span>Pair PATCHWORK Chrome Extension</span>
+            <span>Pair Axon Chrome Extension</span>
           </CommandItem>
         </CommandGroup>
 

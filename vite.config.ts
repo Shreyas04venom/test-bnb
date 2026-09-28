@@ -180,6 +180,12 @@ export default defineConfig({
     },
   },
   envDir: path.resolve(import.meta.dirname),
+  envPrefix: ["VITE_", "NEXT_PUBLIC_"],
+  define: {
+    "process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": JSON.stringify(
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "pk_test_ZmFpdGhmdWwtZWdyZXQtMjgwMS5jbGVyay5hY2NvdW50cy5kZXYk"
+    ),
+  },
   root: path.resolve(import.meta.dirname, "client"),
   publicDir: path.resolve(import.meta.dirname, "client", "public"),
   build: {

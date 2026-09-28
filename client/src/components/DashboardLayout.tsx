@@ -293,8 +293,10 @@ export function DashboardLayout({ children, title, subtitle, actions }: Dashboar
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-black/10 bg-white/80 hover:bg-white text-xs font-semibold text-[#1B133C] shadow-2xs transition-all">
                   <FolderGit2 className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>{activeProject.name}</span>
-                  <span className="text-[10px] font-mono font-normal text-muted-foreground">({activeProject.framework})</span>
+                  <span>{activeProject ? activeProject.name : 'Select Project'}</span>
+                  {activeProject && (
+                    <span className="text-[10px] font-mono font-normal text-muted-foreground">({activeProject.framework})</span>
+                  )}
                   <ChevronDown className="w-3 h-3 text-muted-foreground ml-1" />
                 </button>
               </DropdownMenuTrigger>
@@ -321,16 +323,18 @@ export function DashboardLayout({ children, title, subtitle, actions }: Dashboar
             </DropdownMenu>
 
             {/* Live Environment Badge */}
-            <a
-              href={activeProject.productionUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center gap-1.5 text-xs text-emerald-700 font-medium px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 hover:bg-emerald-100 transition-colors"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>{activeProject.productionUrl.replace('https://', '')}</span>
-              <ExternalLink className="w-3 h-3 text-emerald-600" />
-            </a>
+            {activeProject && (
+              <a
+                href={activeProject.productionUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden sm:inline-flex items-center gap-1.5 text-xs text-emerald-700 font-medium px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 hover:bg-emerald-100 transition-colors"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>{activeProject.productionUrl.replace('https://', '')}</span>
+                <ExternalLink className="w-3 h-3 text-emerald-600" />
+              </a>
+            )}
           </div>
 
           {/* Right Controls */}

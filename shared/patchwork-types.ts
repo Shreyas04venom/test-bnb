@@ -9,6 +9,9 @@ export interface User {
   cursorColor: string;
   timezone: string;
   githubUsername?: string;
+  clerkId?: string;
+  isEmailVerified?: boolean;
+  connectedProviders?: string[];
 }
 
 export interface Workspace {

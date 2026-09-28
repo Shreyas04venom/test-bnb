@@ -1,0 +1,111 @@
+{
+  "workspace": {
+    "id": "ws-prod-1",
+    "name": "Axon Production Workspace",
+    "slug": "axon-prod",
+    "ownerId": "usr-owner-1",
+    "plan": "Enterprise",
+    "membersCount": 1,
+    "createdAt": "2026-09-28T12:11:52.958Z"
+  },
+  "currentUser": {
+    "id": "usr-owner-1",
+    "name": "Shreyas (Team Lead)",
+    "email": "shreyas@axon.dev",
+    "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    "role": "owner",
+    "cursorColor": "#6366F1",
+    "timezone": "UTC",
+    "githubUsername": "shreyas-axon"
+  },
+  "projects": [
+    {
+      "id": "proj-1790597730939",
+      "workspaceId": "ws-prod-1",
+      "name": "My Storefront",
+      "slug": "my-storefront",
+      "productionUrl": "https://my-app.com",
+      "framework": "Next.js",
+      "repositoryId": "repo-1790597730939",
+      "repositoryName": "org/storefront-web",
+      "repositoryUrl": "https://github.com/org/storefront-web",
+      "deploymentProvider": "vercel",
+      "deploymentProjectId": "deploy_prj_1790597730939",
+      "defaultBranch": "main",
+      "status": "production_healthy",
+      "ownershipStatus": "verified",
+      "verifiedAt": "2026-09-28T12:15:30.939Z",
+      "createdAt": "2026-09-28T12:15:30.939Z",
+      "updatedAt": "2026-09-28T12:15:30.939Z"
+    }
+  ],
+  "patches": [],
+  "collaborators": [
+    {
+      "id": "mem-1",
+      "workspaceId": "ws-prod-1",
+      "userId": "usr-owner-1",
+      "user": {
+        "id": "usr-owner-1",
+        "name": "Shreyas (Team Lead)",
+        "email": "shreyas@axon.dev",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "UTC",
+        "githubUsername": "shreyas-axon"
+      },
+      "role": "owner",
+      "joinedAt": "2026-09-28T12:11:52.971Z",
+      "status": "active"
+    }
+  ],
+  "extensionSessions": [],
+  "deployments": [],
+  "verifications": [],
+  "auditLogs": [
+    {
+      "id": "aud-1790597730939",
+      "action": "PROJECT_CREATED",
+      "user": "Shreyas (Team Lead)",
+      "userId": "usr-owner-1",
+      "projectId": "proj-1790597730939",
+      "projectName": "My Storefront",
+      "timestamp": "2026-09-28T12:15:30.939Z",
+      "result": "success",
+      "metadata": {
+        "repo": "org/storefront-web",
+        "url": "https://my-app.com"
+      }
+    },
+    {
+      "id": "aud-init",
+      "action": "WORKSPACE_SETTINGS_UPDATED",
+      "user": "System",
+      "userId": "usr-owner-1",
+      "timestamp": "2026-09-28T12:11:52.971Z",
+      "result": "success",
+      "metadata": {
+        "note": "Production Axon workspace initialized"
+      }
+    }
+  ],
+  "conflicts": [],
+  "integrations": {
+    "github": {
+      "connected": true,
+      "org": "axon-team",
+      "appInstalled": true
+    },
+    "vercel": {
+      "connected": true,
+      "team": "axon-prod"
+    },
+    "netlify": {
+      "connected": false
+    },
+    "supabase": {
+      "connected": false
+    }
+  }
+}

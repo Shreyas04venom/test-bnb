@@ -6,158 +6,146 @@ import type {
   Deployment,
   VerificationRun,
   AuditLog,
+  AuditAction,
+  PatchReview,
   ExtensionSession,
-  IntegrationsConfig,
-  ConflictItem
+  WorkspaceMember,
+  ConflictItem,
+  Environment,
+  DeploymentProviderType,
 } from '../shared/patchwork-types';
+import {
+  getStore,
+  saveStore,
+  resetStore,
+  createPairingCode,
+  verifyAndConsumePairingCode,
+  recordPresence,
+  getActivePresence,
+} from './store';
 
 export const patchworkApiRouter = Router();
 
-// In-Memory state for the server session and extension clients
-let serverProjects: Project[] = [
-  {
-    id: 'proj-1',
-    workspaceId: 'ws-1',
-    name: 'ShopWave',
-    slug: 'shopwave',
-    productionUrl: 'https://shopwave.dev',
-    framework: 'Next.js',
-    repositoryId: 'repo-101',
-    repositoryName: 'company/shopwave-web',
-    repositoryUrl: 'https://github.com/company/shopwave-web',
-    deploymentProvider: 'vercel',
-    deploymentProjectId: 'prj_shopwave_vercel',
-    defaultBranch: 'main',
-    status: 'production_healthy',
-    ownershipStatus: 'verified',
-    verifiedAt: '2026-02-10T11:20:00Z',
-    createdAt: '2026-01-12T08:00:00Z',
-    updatedAt: '2026-09-28T10:15:00Z',
-  },
-  {
-    id: 'proj-2',
-    workspaceId: 'ws-1',
-    name: 'CuraCommerce',
-    slug: 'curacommerce',
-    productionUrl: 'https://curacommerce.io',
-    framework: 'Next.js',
-    repositoryId: 'repo-102',
-    repositoryName: 'company/curacommerce-app',
-    repositoryUrl: 'https://github.com/company/curacommerce-app',
-    deploymentProvider: 'netlify',
-    deploymentProjectId: 'site_cura_netlify',
-    defaultBranch: 'production',
-    status: 'production_healthy',
-    ownershipStatus: 'verified',
-    verifiedAt: '2026-02-14T09:40:00Z',
-    createdAt: '2026-01-20T12:00:00Z',
-    updatedAt: '2026-09-27T16:22:00Z',
-  },
-  {
-    id: 'proj-3',
-    workspaceId: 'ws-1',
-    name: 'LandingLab',
-    slug: 'landinglab',
-    productionUrl: 'https://landinglab.co',
-    framework: 'React (Vite)',
-    repositoryId: 'repo-103',
-    repositoryName: 'company/landinglab-site',
-    repositoryUrl: 'https://github.com/company/landinglab-site',
-    deploymentProvider: 'vercel',
-    deploymentProjectId: 'prj_landinglab_vercel',
-    defaultBranch: 'main',
-    status: 'production_healthy',
-    ownershipStatus: 'verified',
-    verifiedAt: '2026-03-01T15:00:00Z',
-    createdAt: '2026-02-05T09:30:00Z',
-    updatedAt: '2026-09-25T11:05:00Z',
-  },
-];
+// Reusable Helpers
+function pushAudit(
+  action: AuditAction,
+  details: {
+    projectId?: string;
+    projectName?: string;
+    patchId?: string;
+    result?: 'success' | 'failure' | 'warning';
+    metadata?: Record<string, any>;
+  } = {},
+  req?: Request
+) {
+  const store = getStore();
+  const entry: AuditLog = {
+    id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    action,
+    user: store.currentUser,
+    timestamp: new Date().toISOString(),
+    ip: (req?.ip as string) || '127.0.0.1',
+    userAgent: (req?.headers?.['user-agent'] as string) || 'Axon Platform',
+    result: details.result || 'success',
+    metadata: details.metadata || {},
+    ...(details.projectId ? { projectId: details.projectId } : {}),
+    ...(details.projectName ? { projectName: details.projectName } : {}),
+    ...(details.patchId ? { patchId: details.patchId } : {}),
+  };
+  store.auditLogs.unshift(entry);
+}
 
-let serverPatches: Patch[] = [
-  {
-    id: 'PW-104',
-    projectId: 'proj-1',
-    workspaceId: 'ws-1',
-    author: {
-      id: 'usr-1',
-      name: 'Shreyas',
-      email: 'shreyas@patchwork.dev',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      role: 'owner',
-      cursorColor: '#6366F1',
-      timezone: 'America/San_Francisco',
-      githubUsername: 'shreyas-pw',
-    },
-    title: 'Update hero CTA & glassmorphism badge',
-    description: 'Updated hero action button typography, rounded padding, and converted static pill into glassmorphic pill badge with subtle hover transition.',
-    status: 'READY_TO_DEPLOY',
-    riskLevel: 'LOW',
-    branchName: 'patchwork/PW-104-hero-cta',
-    commitSha: 'a8f9c12',
-    previewUrl: 'https://shopwave-git-patchwork-pw-104.vercel.app',
-    productionDeploymentId: 'DEP-89',
-    source: 'extension',
-    createdAt: '2026-09-28T09:30:00Z',
-    updatedAt: '2026-09-28T14:45:00Z',
-    files: [
-      {
-        filename: 'src/components/Hero.tsx',
-        category: 'frontend',
-        changeType: 'modified',
-        additions: 12,
-        deletions: 4,
-        diffSummary: 'Changed CTA button classes and added glowing pill badge markup',
-        oldContent: `export function Hero() { ... }`,
-        newContent: `export function Hero() { ... }`,
-      },
+function createMockVerification(patchId: string, projectId = 'proj-1'): VerificationRun {
+  return {
+    id: `ver-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    patchId,
+    projectId,
+    status: 'passed',
+    totalChecks: 12,
+    passedChecks: 12,
+    visualSimilarityPercent: 99.8,
+    potentialRegression: 'low',
+    startedAt: new Date().toISOString(),
+    completedAt: new Date().toISOString(),
+    checks: [
+      { id: 'vc-1', stepNumber: 1, name: 'Build', description: 'Production bundle compilation', status: 'passed', durationMs: 1200 },
+      { id: 'vc-2', stepNumber: 2, name: 'Typecheck', description: 'TypeScript strict checking', status: 'passed', durationMs: 750 },
+      { id: 'vc-3', stepNumber: 3, name: 'Visual Regression', description: 'Perceptual screenshot diffing', status: 'passed', durationMs: 1400 },
     ],
-    comments: [],
-    reviews: [],
-    aiSummary: {
-      explanation: 'Replaces plain buttons with high-contrast pill styling and adds a live status beacon.',
-      why: 'Improves CTA conversion and matches modern editorial aesthetic requested in design review.',
-      affectedComponents: ['Hero', 'Navbar', 'CallToActionSection'],
-      potentialRisks: ['Check dark mode text contrast on ultra-wide screens'],
-      dependencies: ['Tailwind CSS v4 inline glass tokens'],
-    },
-  },
-];
+  };
+}
 
-let serverPairingCodes: Record<string, { code: string; expiresAt: number; userId: string }> = {};
-let serverExtensionSessions: ExtensionSession[] = [];
+function createDeploymentRecord(
+  patch: Patch,
+  environment: Environment = 'preview',
+  provider: DeploymentProviderType = 'vercel'
+): Deployment {
+  return {
+    id: `DEP-${Math.floor(100 + Math.random() * 900)}`,
+    projectId: patch.projectId,
+    patchId: patch.id,
+    environment,
+    provider,
+    commitSha: patch.commitSha || 'main',
+    branch: patch.branchName || 'main',
+    author: patch.author,
+    status: 'READY',
+    previewUrl: patch.previewUrl,
+    durationSeconds: 22,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+// ==========================================
+// 0. FULL STATE SNAPSHOT & RESET
+// ==========================================
+patchworkApiRouter.get('/state', (_req: Request, res: Response) => {
+  const store = getStore();
+  res.json({
+    success: true,
+    data: store,
+  });
+});
+
+patchworkApiRouter.post('/reset-data', (req: Request, res: Response) => {
+  const { seedStarter } = req.body || {};
+  const freshStore = resetStore(Boolean(seedStarter));
+  res.json({
+    success: true,
+    message: seedStarter
+      ? 'Workspace seeded with 1 production starter project'
+      : 'Workspace cleared of all sample data — clean slate ready',
+    data: freshStore,
+  });
+});
 
 // ==========================================
 // 1. AUTH API (/api/auth)
 // ==========================================
 patchworkApiRouter.get('/auth/me', (_req: Request, res: Response) => {
+  const store = getStore();
   res.json({
     success: true,
-    user: {
-      id: 'usr-1',
-      name: 'Shreyas',
-      email: 'shreyas@patchwork.dev',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      role: 'owner',
-      cursorColor: '#6366F1',
-      workspaceId: 'ws-1',
-    },
+    user: store.currentUser,
   });
 });
 
 patchworkApiRouter.post('/auth/login', (req: Request, res: Response) => {
-  const { email } = req.body;
+  const { email, name } = req.body;
+  const store = getStore();
+  const userName = name || (email ? email.split('@')[0] : 'Team Lead');
+
+  store.currentUser = {
+    ...store.currentUser,
+    name: userName,
+    email: email || store.currentUser.email,
+  };
+  saveStore();
+
   res.json({
     success: true,
-    user: {
-      id: 'usr-1',
-      name: email ? email.split('@')[0] : 'Shreyas',
-      email: email || 'shreyas@patchwork.dev',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      role: 'owner',
-      cursorColor: '#6366F1',
-    },
-    token: 'pw_sess_jwt_mock_7a892b1',
+    user: store.currentUser,
+    token: `axon_live_token_${Date.now()}`,
   });
 });
 
@@ -169,11 +157,13 @@ patchworkApiRouter.post('/auth/logout', (_req: Request, res: Response) => {
 // 2. PROJECTS API (/api/projects)
 // ==========================================
 patchworkApiRouter.get('/projects', (_req: Request, res: Response) => {
-  res.json({ success: true, projects: serverProjects });
+  const store = getStore();
+  res.json({ success: true, projects: store.projects });
 });
 
 patchworkApiRouter.get('/projects/:id', (req: Request, res: Response) => {
-  const project = serverProjects.find((p) => p.id === req.params.id);
+  const store = getStore();
+  const project = store.projects.find((p) => p.id === req.params.id);
   if (!project) {
     return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Project not found' } });
   }
@@ -195,9 +185,10 @@ patchworkApiRouter.post('/projects', (req: Request, res: Response) => {
     return res.status(400).json({ success: false, error: parsed.error.format() });
   }
 
+  const store = getStore();
   const newProject: Project = {
     id: `proj-${Date.now()}`,
-    workspaceId: 'ws-1',
+    workspaceId: store.workspace.id,
     name: parsed.data.name,
     slug: parsed.data.slug,
     productionUrl: parsed.data.productionUrl,
@@ -210,39 +201,81 @@ patchworkApiRouter.post('/projects', (req: Request, res: Response) => {
     defaultBranch: 'main',
     status: 'production_healthy',
     ownershipStatus: 'verified',
+    verifiedAt: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
-  serverProjects.unshift(newProject);
+  store.projects.unshift(newProject);
+  pushAudit('PROJECT_CREATED', {
+    projectId: newProject.id,
+    projectName: newProject.name,
+    metadata: { repo: newProject.repositoryName, url: newProject.productionUrl },
+  }, req);
+
+  saveStore();
   res.status(201).json({ success: true, project: newProject });
 });
 
-patchworkApiRouter.post('/projects/:id/verify', (req: Request, res: Response) => {
-  const project = serverProjects.find((p) => p.id === req.params.id);
+patchworkApiRouter.patch('/projects/:id', (req: Request, res: Response) => {
+  const store = getStore();
+  const project = store.projects.find((p) => p.id === req.params.id);
   if (!project) {
     return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Project not found' } });
   }
+
+  Object.assign(project, req.body, { updatedAt: new Date().toISOString() });
+  saveStore();
+  res.json({ success: true, project });
+});
+
+patchworkApiRouter.post('/projects/:id/verify', (req: Request, res: Response) => {
+  const store = getStore();
+  const project = store.projects.find((p) => p.id === req.params.id);
+  if (!project) {
+    return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Project not found' } });
+  }
+
   project.ownershipStatus = 'verified';
   project.verifiedAt = new Date().toISOString();
   project.status = 'production_healthy';
-  res.json({ success: true, project, verified: true, message: 'Ownership verified via GitHub organization attestation' });
+  project.updatedAt = new Date().toISOString();
+
+  pushAudit('PROJECT_OWNERSHIP_VERIFIED', {
+    projectId: project.id,
+    projectName: project.name,
+  }, req);
+
+  saveStore();
+  res.json({ success: true, project });
+});
+
+patchworkApiRouter.delete('/projects/:id', (req: Request, res: Response) => {
+  const store = getStore();
+  const idx = store.projects.findIndex((p) => p.id === req.params.id);
+  if (idx !== -1) {
+    store.projects.splice(idx, 1);
+    saveStore();
+  }
+  res.json({ success: true, message: 'Project deleted' });
 });
 
 // ==========================================
 // 3. PATCHES API (/api/patches)
 // ==========================================
 patchworkApiRouter.get('/patches', (req: Request, res: Response) => {
-  const projectId = req.query.projectId as string | undefined;
-  const status = req.query.status as string | undefined;
-  let result = serverPatches;
-  if (projectId) result = result.filter((p) => p.projectId === projectId);
-  if (status) result = result.filter((p) => p.status === status);
-  res.json({ success: true, patches: result });
+  const store = getStore();
+  const { projectId } = req.query;
+  let list = store.patches;
+  if (projectId && typeof projectId === 'string') {
+    list = list.filter((p) => p.projectId === projectId);
+  }
+  res.json({ success: true, patches: list });
 });
 
 patchworkApiRouter.get('/patches/:id', (req: Request, res: Response) => {
-  const patch = serverPatches.find((p) => p.id === req.params.id);
+  const store = getStore();
+  const patch = store.patches.find((p) => p.id === req.params.id);
   if (!patch) {
     return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Patch not found' } });
   }
@@ -250,161 +283,319 @@ patchworkApiRouter.get('/patches/:id', (req: Request, res: Response) => {
 });
 
 patchworkApiRouter.post('/patches', (req: Request, res: Response) => {
-  const { title, projectId, description, files, riskLevel, source } = req.body;
-  const patchId = `PW-${serverPatches.length + 105}`;
+  const store = getStore();
+  const { title, description, projectId, files, riskLevel } = req.body;
+
+  const targetProject = store.projects.find((p) => p.id === projectId) || store.projects[0];
+  const patchId = `PW-${store.patches.length + 101}`;
+
   const newPatch: Patch = {
     id: patchId,
-    projectId: projectId || 'proj-1',
-    workspaceId: 'ws-1',
-    author: {
-      id: 'usr-1',
-      name: 'Shreyas',
-      email: 'shreyas@patchwork.dev',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      role: 'owner',
-      cursorColor: '#6366F1',
-      timezone: 'America/San_Francisco',
-    },
-    title: title || 'Visual modification',
-    description: description || 'Created via PATCHWORK API',
-    status: 'DRAFT',
+    projectId: targetProject?.id || 'proj-1',
+    workspaceId: store.workspace.id,
+    author: store.currentUser,
+    title: title || 'Visual Hotfix from Axon Studio',
+    description: description || 'Visual DOM changes captured from browser inspector',
+    status: 'SUBMITTED',
     riskLevel: riskLevel || 'LOW',
-    branchName: `patchwork/${patchId.toLowerCase()}`,
+    branchName: `axon/${patchId.toLowerCase()}`,
     commitSha: Math.random().toString(16).substring(2, 9),
-    previewUrl: `https://shopwave-git-${patchId.toLowerCase()}.vercel.app`,
-    files: files || [],
+    previewUrl: targetProject?.productionUrl || 'http://localhost:3000',
+    files: files || [
+      {
+        filename: 'src/styles/overrides.css',
+        category: 'frontend',
+        changeType: 'modified',
+        additions: 12,
+        deletions: 2,
+        oldContent: '/* baseline */',
+        newContent: '/* live hotfix */',
+        diffSummary: 'Adjusted visual styling and element hierarchy',
+      },
+    ],
     comments: [],
     reviews: [],
-    source: source || 'extension',
+    source: 'web',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    aiSummary: {
+      explanation: `Captured ${files?.length || 1} visual UI modifications directly from the browser viewport.`,
+      why: 'Production visual hotfix staged via Axon Chrome Extension.',
+      affectedComponents: ['Viewport View', 'Design Tokens'],
+      potentialRisks: ['Verify cross-browser contrast & responsive viewport breakpoints'],
+      dependencies: ['CSS/DOM inline overrides'],
+    },
   };
 
-  serverPatches.unshift(newPatch);
+  store.patches.unshift(newPatch);
+
+  // Auto-generate matching preview deployment
+  const newDeployment = createDeploymentRecord(newPatch, 'preview', (targetProject?.deploymentProvider as any) || 'vercel');
+  store.deployments.unshift(newDeployment);
+
+  // Auto-generate verification record
+  store.verifications.unshift(createMockVerification(newPatch.id, newPatch.projectId));
+
+  pushAudit('PATCH_CREATED', {
+    patchId: newPatch.id,
+    projectId: newPatch.projectId,
+    metadata: { title: newPatch.title, source: newPatch.source },
+  }, req);
+
+  saveStore();
   res.status(201).json({ success: true, patch: newPatch });
 });
 
 patchworkApiRouter.patch('/patches/:id', (req: Request, res: Response) => {
-  const patch = serverPatches.find((p) => p.id === req.params.id);
+  const store = getStore();
+  const patch = store.patches.find((p) => p.id === req.params.id);
   if (!patch) {
     return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Patch not found' } });
   }
+
   Object.assign(patch, req.body, { updatedAt: new Date().toISOString() });
+
+  pushAudit('PATCH_UPDATED', {
+    patchId: patch.id,
+    metadata: req.body,
+  }, req);
+
+  saveStore();
   res.json({ success: true, patch });
+});
+
+patchworkApiRouter.post('/patches/:id/review', (req: Request, res: Response) => {
+  const { decision, notes } = req.body;
+  const store = getStore();
+  const patch = store.patches.find((p) => p.id === req.params.id);
+  if (!patch) {
+    return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Patch not found' } });
+  }
+
+  const reviewRecord: PatchReview = {
+    id: `rev-${Date.now()}`,
+    patchId: patch.id,
+    author: store.currentUser,
+    status: decision || 'APPROVED',
+    comment: notes || 'Reviewed and approved for deployment',
+    createdAt: new Date().toISOString(),
+  };
+
+  patch.reviews.unshift(reviewRecord);
+  patch.status = decision === 'APPROVED' ? 'APPROVED' : 'CHANGES_REQUESTED';
+  patch.updatedAt = new Date().toISOString();
+
+  pushAudit(decision === 'APPROVED' ? 'PATCH_APPROVED' : 'PATCH_REJECTED', {
+    patchId: patch.id,
+  }, req);
+
+  saveStore();
+  res.json({ success: true, patch, review: reviewRecord });
+});
+
+patchworkApiRouter.post('/patches/:id/deploy', (req: Request, res: Response) => {
+  const store = getStore();
+  const patch = store.patches.find((p) => p.id === req.params.id);
+  if (!patch) {
+    return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Patch not found' } });
+  }
+
+  patch.status = 'DEPLOYED';
+  patch.updatedAt = new Date().toISOString();
+
+  const prodDeploy = createDeploymentRecord(patch, 'production', 'vercel');
+  store.deployments.unshift(prodDeploy);
+
+  pushAudit('DEPLOYMENT_COMPLETED', {
+    patchId: patch.id,
+  }, req);
+
+  saveStore();
+  res.json({ success: true, patch, deployment: prodDeploy });
 });
 
 // ==========================================
 // 4. DEPLOYMENTS API (/api/deployments)
 // ==========================================
 patchworkApiRouter.get('/deployments', (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    deployments: [
-      {
-        id: 'DEP-89',
-        projectId: 'proj-1',
-        patchId: 'PW-104',
-        environment: 'preview',
-        provider: 'vercel',
-        commitSha: 'a8f9c12',
-        branch: 'patchwork/PW-104-hero-cta',
-        status: 'READY',
-        previewUrl: 'https://shopwave-git-patchwork-pw-104.vercel.app',
-        durationSeconds: 38,
-        createdAt: '2026-09-28T09:32:00Z',
-      },
-    ],
-  });
+  const store = getStore();
+  res.json({ success: true, deployments: store.deployments });
 });
 
 // ==========================================
 // 5. VERIFICATION API (/api/verifications)
 // ==========================================
 patchworkApiRouter.get('/verifications', (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    verification: {
-      id: 'ver-104',
-      patchId: 'PW-104',
-      status: 'passed',
-      visualSimilarityPercent: 98.7,
-      checksPassed: 12,
-      totalChecks: 12,
-    },
-  });
+  const store = getStore();
+  res.json({ success: true, verifications: store.verifications });
 });
 
 patchworkApiRouter.post('/verifications/run', (req: Request, res: Response) => {
   const { patchId } = req.body;
+  const store = getStore();
+  const patch = store.patches.find((p) => p.id === patchId);
+
+  const run = createMockVerification(patchId || 'PW-live', patch?.projectId || 'proj-1');
+  store.verifications.unshift(run);
+
+  pushAudit('VERIFICATION_PASSED', {
+    patchId,
+  }, req);
+
+  saveStore();
+
   res.json({
     success: true,
-    message: `Verification suite started for ${patchId || 'PW-104'}`,
-    status: 'passed',
-    passedChecks: 12,
-    similarity: 98.7,
+    message: `Visual regression & DOM integrity verification suite passed for ${patchId}`,
+    verification: run,
   });
 });
 
 // ==========================================
-// 6. INTEGRATIONS API (/api/integrations)
+// 6. COLLABORATORS & TEAM API (/api/collaborators)
 // ==========================================
-patchworkApiRouter.get('/integrations', (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    integrations: {
-      github: { connected: true, org: 'company', appInstalled: true },
-      vercel: { connected: true, team: 'agnidev-team' },
-      netlify: { connected: true, team: 'company-net' },
-      supabase: { connected: true, projectUrl: 'https://vbtlzywxqabn.supabase.co' },
+patchworkApiRouter.get('/collaborators', (_req: Request, res: Response) => {
+  const store = getStore();
+  res.json({ success: true, collaborators: store.collaborators });
+});
+
+patchworkApiRouter.post('/collaborators/invite', (req: Request, res: Response) => {
+  const { email, name, role, cursorColor } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, error: 'Email is required' });
+  }
+
+  const store = getStore();
+  const colors = ['#6366F1', '#EC4899', '#10B981', '#F59E0B', '#3B82F6', '#8B5CF6'];
+  const assignedColor = cursorColor || colors[store.collaborators.length % colors.length];
+
+  const newMember: WorkspaceMember = {
+    id: `mem-${Date.now()}`,
+    workspaceId: store.workspace.id,
+    userId: `usr-${Date.now()}`,
+    user: {
+      id: `usr-${Date.now()}`,
+      name: name || email.split('@')[0],
+      email,
+      avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${name || email}`,
+      role: role || 'developer',
+      cursorColor: assignedColor,
+      timezone: 'UTC',
     },
-  });
+    role: role || 'developer',
+    joinedAt: new Date().toISOString(),
+    status: 'active',
+  };
+
+  store.collaborators.push(newMember);
+  store.workspace.membersCount = store.collaborators.length;
+
+  pushAudit('COLLABORATOR_INVITED', {
+    metadata: { email, role: newMember.role },
+  }, req);
+
+  saveStore();
+  res.status(201).json({ success: true, member: newMember });
+});
+
+patchworkApiRouter.patch('/collaborators/:id', (req: Request, res: Response) => {
+  const store = getStore();
+  const member = store.collaborators.find((m) => m.id === req.params.id);
+  if (!member) {
+    return res.status(404).json({ success: false, error: 'Collaborator not found' });
+  }
+
+  if (req.body.role) {
+    member.role = req.body.role;
+    member.user.role = req.body.role;
+  }
+  saveStore();
+  res.json({ success: true, member });
+});
+
+patchworkApiRouter.delete('/collaborators/:id', (req: Request, res: Response) => {
+  const store = getStore();
+  const idx = store.collaborators.findIndex((m) => m.id === req.params.id);
+  if (idx !== -1) {
+    store.collaborators.splice(idx, 1);
+    store.workspace.membersCount = Math.max(1, store.collaborators.length);
+    saveStore();
+  }
+  res.json({ success: true, message: 'Collaborator removed' });
 });
 
 // ==========================================
-// 7. EXTENSION API (/api/extension/*)
-// (First-Class Client API for Chrome Extension)
+// 7. REAL EXTENSION PAIRING & MULTIPLAYER API
 // ==========================================
-// POST /api/extension/pair -> Generates secure 6-digit code
+
+// POST /api/extension/pair -> Generate 6-digit PIN code
 patchworkApiRouter.post('/extension/pair', (_req: Request, res: Response) => {
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  serverPairingCodes[code] = {
-    code,
-    expiresAt: Date.now() + 10 * 60 * 1000, // 10 min
-    userId: 'usr-1',
-  };
+  const store = getStore();
+  const code = createPairingCode(store.currentUser.id, store.workspace.id);
+
   res.json({
     success: true,
     pairingCode: code,
-    expiresInSeconds: 600,
-    instructions: 'Enter this 6-digit code in the PATCHWORK Chrome Extension or approve via /extension/connect',
+    expiresInSeconds: 900,
+    workspaceName: store.workspace.name,
+    user: store.currentUser.name,
   });
 });
 
-// POST /api/extension/session -> Exchange pairing code or approval for token
+// POST /api/extension/session -> Handshake & session creation
 patchworkApiRouter.post('/extension/session', (req: Request, res: Response) => {
-  const { pairingCode, deviceName, browser } = req.body;
-  const token = `pw_ext_tok_${Math.random().toString(36).substring(2, 16)}`;
+  const { pairingCode, deviceName, browser, autoApprove } = req.body;
+  const store = getStore();
 
+  let approved = false;
+
+  if (autoApprove) {
+    approved = true;
+  } else if (pairingCode) {
+    const verified = verifyAndConsumePairingCode(pairingCode);
+    if (!verified) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_PAIRING_CODE',
+          message: 'Pairing code is invalid, expired, or already used. Please request a new PIN from Axon Studio.',
+        },
+      });
+    }
+    approved = true;
+  }
+
+  if (!approved) {
+    return res.status(400).json({ success: false, error: 'Pairing code is required' });
+  }
+
+  const token = `axon_ext_tok_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
   const newSession: ExtensionSession = {
     id: `ext-sess-${Date.now()}`,
-    userId: 'usr-1',
-    workspaceId: 'ws-1',
-    deviceName: deviceName || "Chrome Extension Client",
+    userId: store.currentUser.id,
+    workspaceId: store.workspace.id,
+    deviceName: deviceName || 'Chrome Browser',
     browser: browser || 'Chrome 129',
-    tokenHash: `hash_${token.substring(0, 10)}...`,
+    tokenHash: `hash_${token.substring(0, 16)}...`,
     permissions: [
-      'View projects',
-      'Create patches',
-      'Read project configuration',
-      'Submit patches',
-      'View deployment status',
+      'read:projects',
+      'write:patches',
+      'read:collaborators',
+      'realtime:presence',
+      'audit:events',
     ],
     createdAt: new Date().toISOString(),
     lastActiveAt: 'Just now',
     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
   };
 
-  serverExtensionSessions.push(newSession);
+  store.extensionSessions.unshift(newSession);
+
+  pushAudit('EXTENSION_PAIRED', {
+    metadata: { device: newSession.deviceName, browser: newSession.browser },
+  }, req);
+
+  saveStore();
 
   res.json({
     success: true,
@@ -412,96 +603,121 @@ patchworkApiRouter.post('/extension/session', (req: Request, res: Response) => {
     tokenType: 'Bearer',
     expiresInDays: 30,
     workspace: {
-      id: 'ws-1',
-      name: 'AgniDev',
+      id: store.workspace.id,
+      name: store.workspace.name,
     },
-    user: {
-      id: 'usr-1',
-      name: 'Shreyas',
-      email: 'shreyas@patchwork.dev',
-    },
-    session: newSession,
-  });
-});
-
-// DELETE /api/extension/session -> Revoke session
-patchworkApiRouter.delete('/extension/session/:id', (req: Request, res: Response) => {
-  serverExtensionSessions = serverExtensionSessions.filter((s) => s.id !== req.params.id);
-  res.json({ success: true, message: 'Extension session revoked' });
-});
-
-// GET /api/extension/projects -> Extension gets authorized project list
-patchworkApiRouter.get('/extension/projects', (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    projects: serverProjects.map((p) => ({
+    user: store.currentUser,
+    projects: store.projects.map((p) => ({
       id: p.id,
       name: p.name,
       slug: p.slug,
       productionUrl: p.productionUrl,
       framework: p.framework,
-      deploymentProvider: p.deploymentProvider,
+    })),
+    session: newSession,
+  });
+});
+
+// GET /api/extension/sessions -> Lists active sessions
+patchworkApiRouter.get('/extension/sessions', (_req: Request, res: Response) => {
+  const store = getStore();
+  res.json({ success: true, sessions: store.extensionSessions });
+});
+
+// DELETE /api/extension/session/:id -> Revoke session
+patchworkApiRouter.delete('/extension/session/:id', (req: Request, res: Response) => {
+  const store = getStore();
+  const idx = store.extensionSessions.findIndex((s) => s.id === req.params.id);
+  if (idx !== -1) {
+    store.extensionSessions.splice(idx, 1);
+    pushAudit('EXTENSION_REVOKED', {}, req);
+    saveStore();
+  }
+  res.json({ success: true, message: 'Extension session revoked' });
+});
+
+// GET /api/extension/projects -> Extension gets authorized project list
+patchworkApiRouter.get('/extension/projects', (_req: Request, res: Response) => {
+  const store = getStore();
+  res.json({
+    success: true,
+    projects: store.projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      productionUrl: p.productionUrl,
+      framework: p.framework,
       defaultBranch: p.defaultBranch,
-      ownershipVerified: p.ownershipStatus === 'verified',
+      repositoryName: p.repositoryName,
     })),
   });
 });
 
-// GET /api/extension/projects/:id/config -> Extension fetches project selector rules
-patchworkApiRouter.get('/extension/projects/:id/config', (req: Request, res: Response) => {
-  const project = serverProjects.find((p) => p.id === req.params.id);
-  if (!project) {
-    return res.status(404).json({ success: false, error: 'Project not found' });
-  }
-  res.json({
-    success: true,
-    config: {
-      projectId: project.id,
-      productionUrl: project.productionUrl,
-      branch: project.defaultBranch,
-      framework: project.framework,
-      cssEngine: 'Tailwind CSS',
-      allowedSelectors: ['body *'],
-      disallowedSelectors: ['script', 'style', 'iframe'],
-      aiAssistedPatching: true,
-      maxDiffLines: 1500,
-    },
-  });
-});
-
-// POST /api/extension/projects/:id/patches -> Extension creates new visual patch
+// POST /api/extension/projects/:id/patches -> Extension creates visual hotfix
 patchworkApiRouter.post('/extension/projects/:id/patches', (req: Request, res: Response) => {
+  const store = getStore();
+  const project = store.projects.find((p) => p.id === req.params.id);
+  if (!project) {
+    return res.status(404).json({ success: false, error: 'Target project not found' });
+  }
+
   const { title, description, files, riskLevel } = req.body;
-  const patchId = `PW-${serverPatches.length + 105}`;
+  const patchId = `PW-${store.patches.length + 101}`;
+
   const newPatch: Patch = {
     id: patchId,
-    projectId: req.params.id,
-    workspaceId: 'ws-1',
-    author: {
-      id: 'usr-1',
-      name: 'Shreyas',
-      email: 'shreyas@patchwork.dev',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      role: 'owner',
-      cursorColor: '#6366F1',
-      timezone: 'America/San_Francisco',
-    },
-    title: title || 'Visual hotfix from Chrome Extension',
-    description: description || 'Visual DOM edit captured via extension',
+    projectId: project.id,
+    workspaceId: store.workspace.id,
+    author: store.currentUser,
+    title: title || `Visual Hotfix on ${project.name}`,
+    description: description || 'Captured directly from Axon Chrome Extension visual inspector',
     status: 'SUBMITTED',
     riskLevel: riskLevel || 'LOW',
-    branchName: `patchwork/${patchId.toLowerCase()}`,
+    branchName: `axon/${patchId.toLowerCase()}`,
     commitSha: Math.random().toString(16).substring(2, 9),
-    previewUrl: `https://shopwave-git-${patchId.toLowerCase()}.vercel.app`,
-    files: files || [],
+    previewUrl: project.productionUrl,
+    files: Array.isArray(files) && files.length > 0 ? files : [
+      {
+        filename: 'src/styles/visual-overrides.css',
+        category: 'frontend',
+        changeType: 'modified',
+        additions: 8,
+        deletions: 1,
+        oldContent: '/* baseline styles */',
+        newContent: '/* live hotfix styles */',
+        diffSummary: 'Updated visual elements and typography in browser',
+      },
+    ],
     comments: [],
     reviews: [],
     source: 'extension',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    aiSummary: {
+      explanation: `Captured ${files?.length || 1} visual UI modifications directly from the browser viewport.`,
+      why: 'Production visual hotfix staged via Axon Chrome Extension.',
+      affectedComponents: ['Viewport View', 'Design Tokens'],
+      potentialRisks: ['Verify cross-browser contrast & responsive viewport breakpoints'],
+      dependencies: ['CSS/DOM inline overrides'],
+    },
   };
 
-  serverPatches.unshift(newPatch);
+  store.patches.unshift(newPatch);
+
+  // Auto create deployment record
+  store.deployments.unshift(createDeploymentRecord(newPatch, 'preview', 'vercel'));
+
+  // Auto create verification record
+  store.verifications.unshift(createMockVerification(newPatch.id, newPatch.projectId));
+
+  pushAudit('PATCH_CREATED', {
+    patchId: newPatch.id,
+    projectId: newPatch.projectId,
+    metadata: { title: newPatch.title, source: 'extension' },
+  }, req);
+
+  saveStore();
+
   res.status(201).json({
     success: true,
     patch: newPatch,
@@ -509,63 +725,61 @@ patchworkApiRouter.post('/extension/projects/:id/patches', (req: Request, res: R
   });
 });
 
-// POST /api/extension/presence -> Extension publishes user cursor & active element
+// POST /api/extension/presence -> Heartbeat & multiplayer presence sync
 patchworkApiRouter.post('/extension/presence', (req: Request, res: Response) => {
-  const { projectId, route, cursorX, cursorY, selectedElement } = req.body;
+  const { userId, userName, userColor, userAvatar, role, projectId, route, cursorX, cursorY, selectedElement } = req.body;
+
+  recordPresence({
+    id: `pres-${userId || 'anon'}`,
+    userId: userId || 'usr-anonymous',
+    userName: userName || 'Extension User',
+    userColor: userColor || '#6366F1',
+    userAvatar: userAvatar || 'https://api.dicebear.com/7.x/initials/svg?seed=axon',
+    role: role || 'developer',
+    projectId: projectId || '',
+    route: route || '/',
+    cursorX: typeof cursorX === 'number' ? cursorX : 50,
+    cursorY: typeof cursorY === 'number' ? cursorY : 50,
+    selectedElement: selectedElement || '',
+  });
+
+  res.json({ success: true, timestamp: Date.now() });
+});
+
+// GET /api/extension/presence -> Get all active team presence records
+patchworkApiRouter.get('/extension/presence', (_req: Request, res: Response) => {
+  const active = getActivePresence();
   res.json({
     success: true,
-    acknowledged: true,
-    presenceSnapshot: {
-      userId: 'usr-1',
-      projectId,
-      route,
-      cursorX,
-      cursorY,
-      selectedElement,
-      receivedAt: new Date().toISOString(),
-    },
+    presence: active,
+    onlineCount: active.length,
+    timestamp: Date.now(),
   });
 });
 
-// POST /api/extension/events -> Extension publishes lifecycle event
+// POST /api/extension/events -> Log team event
 patchworkApiRouter.post('/extension/events', (req: Request, res: Response) => {
   const { eventType, payload } = req.body;
-  res.json({
-    success: true,
-    eventType,
-    queued: true,
-    timestamp: new Date().toISOString(),
-  });
+  pushAudit('PATCH_UPDATED', {
+    metadata: { eventType, ...payload },
+  }, req);
+  saveStore();
+
+  res.json({ success: true, eventType, timestamp: new Date().toISOString() });
 });
 
 // ==========================================
 // 8. AUDIT API (/api/audit)
 // ==========================================
 patchworkApiRouter.get('/audit', (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    logs: [
-      {
-        id: 'aud-1',
-        action: 'PATCH_UPDATED',
-        user: 'Shreyas',
-        timestamp: new Date().toISOString(),
-        result: 'success',
-      },
-    ],
-  });
+  const store = getStore();
+  res.json({ success: true, logs: store.auditLogs });
 });
 
 // ==========================================
-// 9. COLLABORATORS API (/api/collaborators)
+// 9. CONFLICTS API (/api/conflicts)
 // ==========================================
-patchworkApiRouter.get('/collaborators', (_req: Request, res: Response) => {
-  res.json({
-    success: true,
-    collaborators: [
-      { id: 'usr-1', name: 'Shreyas', email: 'shreyas@patchwork.dev', role: 'owner', status: 'online' },
-      { id: 'usr-2', name: 'Arnav', email: 'arnav@patchwork.dev', role: 'admin', status: 'online' },
-      { id: 'usr-3', name: 'Akshat', email: 'akshat@patchwork.dev', role: 'developer', status: 'online' },
-    ],
-  });
+patchworkApiRouter.get('/conflicts', (_req: Request, res: Response) => {
+  const store = getStore();
+  res.json({ success: true, conflicts: store.conflicts });
 });

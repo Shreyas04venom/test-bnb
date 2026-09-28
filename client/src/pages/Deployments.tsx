@@ -50,22 +50,35 @@ export default function DeploymentsPage() {
       }
     >
       <div className="space-y-6">
-        {/* Deployments List */}
-        <div className="space-y-4">
-          {deployments.map((dep) => {
-            const project = projects.find((p) => p.id === dep.projectId);
-            return (
-              <div
-                key={dep.id}
-                className="glass-card p-5 border border-white/80 hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
-              >
+        {deployments.length === 0 ? (
+          <div className="glass-card p-12 text-center border border-white/80 space-y-4">
+            <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto border border-purple-200">
+              <Rocket className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-[#1B133C]">No Deployments Yet</h3>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                Approve and promote a visual patch to trigger an automated preview build or production release.
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* Deployments List */
+          <div className="space-y-4">
+            {deployments.map((dep) => {
+              const project = projects.find((p) => p.id === dep.projectId);
+              return (
+                <div
+                  key={dep.id}
+                  className="glass-card p-5 border border-white/80 hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
                 <div className="space-y-1.5 min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
                       {dep.id}
                     </span>
                     <span className="text-sm font-bold text-[#1B133C]">
-                      {project?.name || 'ShopWave'}
+                      {project?.name || 'Production Site'}
                     </span>
                     <span
                       className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${
@@ -132,7 +145,8 @@ export default function DeploymentsPage() {
             );
           })}
         </div>
-      </div>
+      )}
+    </div>
 
       {/* BUILD LOGS MODAL */}
       <Dialog open={Boolean(activeLogDep)} onOpenChange={() => setActiveLogDep(null)}>

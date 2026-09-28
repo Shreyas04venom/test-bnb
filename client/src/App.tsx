@@ -1,8 +1,11 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch } from "wouter";
+import { ClerkProvider, useUser } from "@clerk/clerk-react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { usePatchworkStore } from "@/lib/patchworkStore";
 
 // Pages
 import Home from "./pages/Home";
@@ -38,6 +41,58 @@ import ExtensionConnectPage from "./pages/ExtensionConnect";
 import ExtensionSuccessPage from "./pages/ExtensionSuccess";
 import NotFound from "./pages/NotFound";
 
+const CLERK_PUBLISHABLE_KEY =
+  (typeof import.meta !== "undefined" &&
+    (import.meta.env?.VITE_CLERK_PUBLISHABLE_KEY ||
+      import.meta.env?.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)) ||
+  "pk_test_ZmFpdGhmdWwtZWdyZXQtMjgwMS5jbGVyay5hY2NvdW50cy5kZXYk";
+
+// Automatically synchronizes Clerk profile with Axon workspace store
+function ClerkUserSync() {
+  const { user, isSignedIn, isLoaded } = useUser();
+  const { switchUser, currentUser } = usePatchworkStore();
+
+  useEffect(() => {
+    if (isLoaded && isSignedIn && user) {
+      const email = user.primaryEmailAddress?.emailAddress || "developer@axon.dev";
+      const name = user.fullName || user.firstName || email.split("@")[0];
+      const avatar =
+        user.imageUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${name}`;
+
+      const githubAccount = user.externalAccounts?.find(
+        (acc: any) => acc.provider === "github" || acc.provider === "oauth_github"
+      );
+      const githubUsername = (githubAccount as any)?.username || undefined;
+
+      const connectedProviders = user.externalAccounts?.map((acc: any) => acc.provider) || [];
+      const isEmailVerified = user.primaryEmailAddress?.verification?.status === "verified";
+
+      if (
+        !currentUser ||
+        currentUser.email !== email ||
+        currentUser.name !== name ||
+        currentUser.id !== user.id
+      ) {
+        switchUser({
+          id: user.id,
+          clerkId: user.id,
+          name,
+          email,
+          avatar,
+          role: "owner",
+          cursorColor: currentUser?.cursorColor || "#6366F1",
+          timezone: "UTC",
+          githubUsername: githubUsername || currentUser?.githubUsername,
+          isEmailVerified,
+          connectedProviders,
+        });
+      }
+    }
+  }, [isLoaded, isSignedIn, user]);
+
+  return null;
+}
+
 function Router() {
   return (
     <Switch>
@@ -48,9 +103,20 @@ function Router() {
       <Route path="/pricing" component={Home} />
       <Route path="/about" component={Home} />
 
-      {/* Auth */}
-      <Route path="/login" component={AuthPage} />
+      {/* Clerk Auth - Login, Signup & SSO Callback Routing */}
+      <Route path="/sso-callback" component={AuthPage} />
+      <Route path="/signup/sso-callback" component={AuthPage} />
+      <Route path="/sign-up/sso-callback" component={AuthPage} />
+      <Route path="/login/sso-callback" component={AuthPage} />
+      <Route path="/sign-in/sso-callback" component={AuthPage} />
+      <Route path="/signup/:rest*" component={AuthPage} />
       <Route path="/signup" component={AuthPage} />
+      <Route path="/sign-up/:rest*" component={AuthPage} />
+      <Route path="/sign-up" component={AuthPage} />
+      <Route path="/login/:rest*" component={AuthPage} />
+      <Route path="/login" component={AuthPage} />
+      <Route path="/sign-in/:rest*" component={AuthPage} />
+      <Route path="/sign-in" component={AuthPage} />
 
       {/* Onboarding */}
       <Route path="/onboarding" component={OnboardingPage} />
@@ -94,6 +160,7 @@ function Router() {
 
       {/* Chrome Extension Pairing & Auth */}
       <Route path="/extension/connect" component={ExtensionConnectPage} />
+      <Route path="/extension-connect" component={ExtensionConnectPage} />
       <Route path="/extension/success" component={ExtensionSuccessPage} />
       <Route path="/extension/revoke" component={ExtensionConnectPage} />
 
@@ -104,15 +171,32 @@ function Router() {
 }
 
 function App() {
+  const { fetchInitialState, syncPresence } = usePatchworkStore();
+
+  useEffect(() => {
+    // Load fresh state from server on startup
+    fetchInitialState();
+
+    // Live multiplayer presence sync
+    const interval = setInterval(() => {
+      syncPresence();
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+      <ErrorBoundary>
+        <ThemeProvider defaultTheme="light">
+          <TooltipProvider>
+            <Toaster />
+            <ClerkUserSync />
+            <Router />
+          </TooltipProvider>
+        </ThemeProvider>
+      </ErrorBoundary>
+    </ClerkProvider>
   );
 }
 

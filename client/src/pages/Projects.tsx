@@ -70,17 +70,39 @@ export default function ProjectsPage() {
       }
     >
       <div className="space-y-6 max-w-6xl">
-        {/* Project Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project) => {
-            const projectPatches = patches.filter((p) => p.projectId === project.id);
-            const isVercel = project.deploymentProvider.toLowerCase() === 'vercel';
-
-            return (
-              <div
-                key={project.id}
-                className="glass-card p-6 border border-white/80 flex flex-col justify-between hover:shadow-lg transition-all space-y-5"
+        {projects.length === 0 ? (
+          <div className="glass-card p-12 text-center border border-white/80 space-y-4">
+            <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto border border-indigo-200">
+              <FolderGit2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-[#1B133C]">No Projects Connected</h3>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                Connect your web repository to start staging visual hotfixes and multiplayer team reviews.
+              </p>
+            </div>
+            <div className="pt-2 flex justify-center gap-3">
+              <button
+                onClick={() => setCreateModalOpen(true)}
+                className="px-4 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold hover:bg-black transition-all shadow-xs inline-flex items-center gap-1.5"
               >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Your First Project</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Project Cards Grid */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {projects.map((project) => {
+              const projectPatches = patches.filter((p) => p.projectId === project.id);
+              const isVercel = project.deploymentProvider.toLowerCase() === 'vercel';
+
+              return (
+                <div
+                  key={project.id}
+                  className="glass-card p-6 border border-white/80 flex flex-col justify-between hover:shadow-lg transition-all space-y-5"
+                >
                 {/* Header */}
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
@@ -161,7 +183,8 @@ export default function ProjectsPage() {
               </div>
             );
           })}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* CREATE PROJECT MODAL */}

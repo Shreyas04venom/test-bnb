@@ -25,10 +25,10 @@ export default function OnboardingPage() {
   // Form states
   const [githubConnected, setGithubConnected] = useState(integrations.github.connected);
   const [selectedProvider, setSelectedProvider] = useState<'vercel' | 'netlify'>('vercel');
-  const [projectName, setProjectName] = useState('ShopWave');
-  const [repoName, setRepoName] = useState('company/shopwave-web');
+  const [projectName, setProjectName] = useState('My Storefront');
+  const [repoName, setRepoName] = useState('org/storefront-web');
   const [framework, setFramework] = useState<'Next.js' | 'React (Vite)'>('Next.js');
-  const [productionUrl, setProductionUrl] = useState('https://shopwave.dev');
+  const [productionUrl, setProductionUrl] = useState('https://my-app.com');
   const [ownershipVerified, setOwnershipVerified] = useState(false);
 
   const handleFinish = () => {

@@ -21,7 +21,7 @@ export default function VerificationPage() {
 
   const handleRun = () => {
     setIsRunning(true);
-    runVerificationSuite(verificationRun.patchId || 'PW-104');
+    runVerificationSuite(verificationRun.patchId || patches[0]?.id || 'PW-101');
     setTimeout(() => setIsRunning(false), 1400);
   };
 
@@ -130,7 +130,7 @@ export default function VerificationPage() {
             {/* Proposed Patch Screenshot */}
             <div className="space-y-2">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                2. Patch Preview (PW-104)
+                2. Patch Preview ({verificationRun.patchId || patches[0]?.id || 'Active Patch'})
               </span>
               <div className="rounded-xl overflow-hidden border-2 border-indigo-500/60 aspect-video relative bg-slate-900 group">
                 <img

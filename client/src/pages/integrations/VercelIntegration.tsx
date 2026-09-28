@@ -16,15 +16,20 @@ import {
 } from 'lucide-react';
 
 export default function VercelIntegrationPage() {
-  const { integrations, updateIntegrations, logAudit } = usePatchworkStore();
+  const { integrations, updateIntegrations, logAudit, projects: storeProjects } = usePatchworkStore();
   const [isSyncing, setIsSyncing] = useState(false);
   const [connected, setConnected] = useState(integrations.vercel.connected);
 
-  const projects = [
-    { name: 'shopwave-storefront', framework: 'Next.js 14', previewDomain: 'shopwave-pw-104.vercel.app', status: 'ready' },
-    { name: 'curacommerce-dashboard', framework: 'Next.js 14', previewDomain: 'cura-pw-99.vercel.app', status: 'ready' },
-    { name: 'landinglab-marketing', framework: 'React (Vite)', previewDomain: 'landinglab-dev.vercel.app', status: 'ready' },
-  ];
+  const projects = storeProjects.length > 0
+    ? storeProjects.map((p) => ({
+        name: p.slug || p.name.toLowerCase(),
+        framework: p.framework,
+        previewDomain: `${p.slug || 'preview'}-live.vercel.app`,
+        status: 'ready' as const,
+      }))
+    : [
+        { name: 'production-storefront', framework: 'Next.js 14', previewDomain: 'production-app.vercel.app', status: 'ready' as const },
+      ];
 
   const handleSync = () => {
     setIsSyncing(true);
