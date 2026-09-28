@@ -1,41 +1,34 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { usePatchworkStore } from '@/lib/patchworkStore';
 import {
   Users,
-  MousePointer,
-  Sparkles,
-  CheckCircle2,
-  Activity,
-  Layers,
-  MessageSquare,
-  ShieldCheck,
-  Radio,
-  ExternalLink,
+  Chrome,
   UserPlus,
   Trash2,
   Laptop,
-  Chrome,
-  Clock,
   Send,
-  X
+  X,
+  Copy,
+  Check,
+  FolderGit2,
+  Link as LinkIcon,
+  Sparkles,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useUser } from '@clerk/clerk-react';
+import { toast } from 'sonner';
 
 export default function CollaborationPage() {
   const { user: clerkUser } = useUser();
   const {
     currentUser,
-    members,
     presence,
     activeProjectId,
     projects,
-    inviteMember,
-    updateMemberRole,
-    removeMember,
-    updateMyPresence,
-    extensionSessions
+    createProjectInvite,
+    removeProjectCollaborator,
+    extensionSessions,
   } = usePatchworkStore();
 
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -45,15 +38,114 @@ export default function CollaborationPage() {
   const [inviteColor, setInviteColor] = useState('#6366F1');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Instant shareable link state
+  const [generatedInviteUrl, setGeneratedInviteUrl] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+
   const activeProject = projects.find((p) => p.id === activeProjectId) || projects[0];
+
+  // Derive project-scoped collaborators
+  const projectCollaborators = React.useMemo(() => {
+    if (!activeProject) return [];
+    if (Array.isArray(activeProject.collaborators) && activeProject.collaborators.length > 0) {
+      // Deduplicate by email or userId
+      return activeProject.collaborators.filter((c, idx, arr) => {
+        const email = c.user?.email?.toLowerCase().trim();
+        return (
+          arr.findIndex(
+            (x) =>
+              (email && x.user?.email?.toLowerCase().trim() === email) ||
+              x.userId === c.userId
+          ) === idx
+        );
+      });
+    }
+
+    // Fallback: active project owner as sole collaborator
+    const ownerName = activeProject.ownerName || currentUser?.name || 'Owner';
+    const ownerEmail = activeProject.ownerEmail || currentUser?.email || '';
+    const ownerAvatar =
+      currentUser?.avatar ||
+      `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(ownerName)}`;
+
+    return [
+      {
+        id: `collab-owner-${activeProject.id}`,
+        projectId: activeProject.id,
+        userId: activeProject.ownerId || currentUser?.id || 'usr-owner',
+        user: {
+          id: activeProject.ownerId || currentUser?.id || 'usr-owner',
+          name: ownerName,
+          email: ownerEmail,
+          avatar: ownerAvatar,
+          role: 'owner' as const,
+          cursorColor: '#6366F1',
+          timezone: 'UTC',
+        },
+        role: 'owner' as const,
+        joinedAt: activeProject.createdAt,
+      },
+    ];
+  }, [activeProject, currentUser]);
+
+  // Project-scoped online presence
+  const projectPresence = React.useMemo(() => {
+    if (!activeProject) return [];
+    return presence.filter(
+      (p) => !p.currentProject || p.currentProject === activeProject.id
+    );
+  }, [presence, activeProject]);
+
+  // Generate or regenerate shareable invite link
+  const handleGenerateLink = async () => {
+    if (!activeProject) return;
+    setIsGeneratingLink(true);
+    try {
+      const res = await createProjectInvite(activeProject.id, inviteRole);
+      if (res && res.code) {
+        const fullUrl = `${window.location.origin}/invite/${res.code}`;
+        setGeneratedInviteUrl(fullUrl);
+      }
+    } finally {
+      setIsGeneratingLink(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isInviteOpen && activeProject && !generatedInviteUrl) {
+      handleGenerateLink();
+    }
+  }, [isInviteOpen, activeProject]);
+
+  const handleCopyLink = () => {
+    if (!generatedInviteUrl) return;
+    navigator.clipboard.writeText(generatedInviteUrl);
+    setIsCopied(true);
+    toast.success('Shareable Invite Link Copied!', {
+      description: 'Send this link to your friends. They can open it directly to accept or decline.',
+    });
+    setTimeout(() => setIsCopied(false), 2500);
+  };
 
   const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail.trim()) return;
+    if (!activeProject || !inviteEmail.trim()) return;
     setIsSubmitting(true);
     try {
-      await inviteMember(inviteEmail.trim(), inviteName.trim() || undefined, inviteRole, inviteColor);
-      setIsInviteOpen(false);
+      const res = await createProjectInvite(
+        activeProject.id,
+        inviteRole,
+        inviteEmail.trim()
+      );
+      if (res) {
+        const fullUrl = `${window.location.origin}/invite/${res.code}`;
+        setGeneratedInviteUrl(fullUrl);
+        navigator.clipboard.writeText(fullUrl);
+        toast.success(`Invitation created for ${inviteEmail.trim()}!`, {
+          description: 'Invite link copied to clipboard. Share it with your friend!',
+        });
+      }
       setInviteName('');
       setInviteEmail('');
     } finally {
@@ -63,45 +155,51 @@ export default function CollaborationPage() {
 
   const COLOR_PALETTE = ['#6366F1', '#EC4899', '#10B981', '#F59E0B', '#8B5CF6', '#06B6D4'];
 
-  // Deduplicate members list by email or userId to prevent 2-2 duplicate accounts
-  const uniqueMembers = members.filter((m, idx, arr) => {
-    const email = m.user.email?.toLowerCase().trim();
-    return arr.findIndex((x) => (email && x.user.email?.toLowerCase().trim() === email) || x.userId === m.userId) === idx;
-  });
-
   return (
     <DashboardLayout
-      title="Realtime Collaboration"
-      subtitle="Multiplayer presence, live cursor identities, and active route synchronization."
+      title="Multiplayer & Collaboration"
+      subtitle={
+        activeProject
+          ? `Team presence and collaborators for ${activeProject.name}`
+          : 'Multiplayer presence, live cursor identities, and active route synchronization.'
+      }
     >
       <div className="space-y-6">
         {/* TOP CONTROLS & STATUS BAR */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-white border border-black/5 shadow-xs">
           <div className="flex items-center gap-3">
             <div className="flex -space-x-2 overflow-hidden">
-              {uniqueMembers.slice(0, 5).map((m) => {
+              {projectCollaborators.slice(0, 5).map((m) => {
                 const isSelf = Boolean(
                   (currentUser?.id && m.userId === currentUser.id) ||
-                  (currentUser?.email && m.user.email?.toLowerCase() === currentUser.email.toLowerCase()) ||
-                  (clerkUser?.primaryEmailAddress?.emailAddress && m.user.email?.toLowerCase() === clerkUser.primaryEmailAddress.emailAddress.toLowerCase())
+                  (currentUser?.email && m.user?.email?.toLowerCase() === currentUser.email.toLowerCase()) ||
+                  (clerkUser?.primaryEmailAddress?.emailAddress &&
+                    m.user?.email?.toLowerCase() === clerkUser.primaryEmailAddress.emailAddress.toLowerCase())
                 );
                 return (
                   <img
                     key={m.id}
-                    src={isSelf && clerkUser?.imageUrl ? clerkUser.imageUrl : m.user.avatar}
-                    alt={m.user.name}
+                    src={isSelf && clerkUser?.imageUrl ? clerkUser.imageUrl : m.user?.avatar}
+                    alt={m.user?.name || 'Collaborator'}
                     className="inline-block h-8 w-8 rounded-full ring-2 ring-white object-cover"
                   />
                 );
               })}
             </div>
             <div>
-              <p className="text-sm font-semibold text-[#1B133C]">
-                {uniqueMembers.length} Workspace {uniqueMembers.length === 1 ? 'Collaborator' : 'Collaborators'}
+              <p className="text-sm font-semibold text-[#1B133C] flex items-center gap-1.5">
+                <span>{projectCollaborators.length} {projectCollaborators.length === 1 ? 'Collaborator' : 'Collaborators'}</span>
+                {activeProject && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    on <strong className="text-indigo-600 font-semibold">{activeProject.name}</strong>
+                  </span>
+                )}
               </p>
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                {presence.length > 0 ? `${presence.length} active live right now` : '1 active live right now'}
+                {projectPresence.length > 0
+                  ? `${projectPresence.length} active live in project right now`
+                  : '1 active live in project right now'}
               </p>
             </div>
           </div>
@@ -119,46 +217,59 @@ export default function CollaborationPage() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-xs font-semibold text-white shadow-xs transition-colors"
             >
               <UserPlus className="w-3.5 h-3.5" />
-              Invite Teammate
+              Invite Teammate to Project
             </button>
           </div>
         </div>
 
-
-
         {/* TEAM MEMBERS & PRESENCE ROSTER */}
         <div className="glass-card p-6 border border-white/80 space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-black/5">
-            <h3 className="text-base font-bold text-[#1B133C] flex items-center gap-2">
-              <Users className="w-4 h-4 text-indigo-600" />
-              Workspace Members & Access Control
-            </h3>
+            <div>
+              <h3 className="text-base font-bold text-[#1B133C] flex items-center gap-2">
+                <Users className="w-4 h-4 text-indigo-600" />
+                Project Collaborators & Access Control
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Only invited collaborators who accept can see and modify {activeProject?.name || 'this project'}.
+              </p>
+            </div>
             <button
               onClick={() => setIsInviteOpen(true)}
               className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
             >
-              + Add Member
+              + Invite Teammate
             </button>
           </div>
 
           <div className="divide-y divide-black/5 space-y-3">
-            {uniqueMembers.map((m) => {
+            {projectCollaborators.map((m) => {
               const isSelf = Boolean(
                 (currentUser?.id && m.userId === currentUser.id) ||
-                (currentUser?.email && m.user.email?.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
-                (clerkUser?.primaryEmailAddress?.emailAddress && m.user.email?.toLowerCase().trim() === clerkUser.primaryEmailAddress.emailAddress.toLowerCase().trim())
+                (currentUser?.email && m.user?.email?.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
+                (clerkUser?.primaryEmailAddress?.emailAddress &&
+                  m.user?.email?.toLowerCase().trim() === clerkUser.primaryEmailAddress.emailAddress.toLowerCase().trim())
               );
-              const displayName = (isSelf && (clerkUser?.fullName || clerkUser?.firstName))
-                ? (clerkUser.fullName || clerkUser.firstName || '')
-                : (isSelf && currentUser?.name ? currentUser.name : m.user.name);
-              const displayEmail = (isSelf && clerkUser?.primaryEmailAddress?.emailAddress)
-                ? clerkUser.primaryEmailAddress.emailAddress
-                : (isSelf && currentUser?.email ? currentUser.email : (m.user.email || ''));
-              const displayAvatar = (isSelf && clerkUser?.imageUrl)
-                ? clerkUser.imageUrl
-                : (isSelf && currentUser?.avatar ? currentUser.avatar : m.user.avatar);
-              const isOnline = presence.some((p) => p.userId === m.userId) || isSelf;
-              const onlinePresence = presence.find((p) => p.userId === m.userId);
+              const displayName =
+                isSelf && (clerkUser?.fullName || clerkUser?.firstName)
+                  ? clerkUser.fullName || clerkUser.firstName || ''
+                  : isSelf && currentUser?.name
+                  ? currentUser.name
+                  : m.user?.name || 'Collaborator';
+              const displayEmail =
+                isSelf && clerkUser?.primaryEmailAddress?.emailAddress
+                  ? clerkUser.primaryEmailAddress.emailAddress
+                  : isSelf && currentUser?.email
+                  ? currentUser.email
+                  : m.user?.email || '';
+              const displayAvatar =
+                isSelf && clerkUser?.imageUrl
+                  ? clerkUser.imageUrl
+                  : isSelf && currentUser?.avatar
+                  ? currentUser.avatar
+                  : m.user?.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${displayName}`;
+              const isOnline = projectPresence.some((p) => p.userId === m.userId) || isSelf;
+              const onlinePresence = projectPresence.find((p) => p.userId === m.userId);
 
               return (
                 <div
@@ -183,12 +294,17 @@ export default function CollaborationPage() {
                         <p className="text-sm font-bold text-[#1B133C]">{displayName}</p>
                         <span
                           className="w-2.5 h-2.5 rounded-full"
-                          style={{ backgroundColor: m.user.cursorColor }}
-                          title={`Cursor color: ${m.user.cursorColor}`}
+                          style={{ backgroundColor: m.user?.cursorColor || '#6366F1' }}
+                          title={`Cursor color: ${m.user?.cursorColor || '#6366F1'}`}
                         />
                         {isSelf && (
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-200">
                             You
+                          </span>
+                        )}
+                        {m.role === 'owner' && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            Owner
                           </span>
                         )}
                       </div>
@@ -199,29 +315,24 @@ export default function CollaborationPage() {
                   <div className="flex items-center gap-3 text-xs">
                     {onlinePresence && (
                       <div className="px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-mono">
-                        Route: {onlinePresence.currentRoute}
+                        Live Route: {onlinePresence.currentRoute}
                       </div>
                     )}
 
-                    <select
-                      value={m.role}
-                      disabled={m.role === 'owner'}
-                      onChange={(e) => updateMemberRole(m.id, e.target.value)}
-                      className="px-2.5 py-1 rounded-lg border border-black/10 bg-white text-xs font-medium text-[#1B133C] focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-60"
-                    >
-                      <option value="owner">Owner</option>
-                      <option value="admin">Admin</option>
-                      <option value="developer">Developer</option>
-                      <option value="designer">Designer</option>
-                      <option value="qa">QA</option>
-                      <option value="viewer">Viewer</option>
-                    </select>
+                    <span className="px-2.5 py-1 rounded-lg border border-black/10 bg-white text-xs font-semibold text-[#1B133C] capitalize">
+                      {m.role}
+                    </span>
 
-                    {m.role !== 'owner' && m.userId !== currentUser?.id && (
+                    {m.role !== 'owner' && m.userId !== currentUser?.id && activeProject && (
                       <button
-                        onClick={() => removeMember(m.id)}
+                        onClick={() => {
+                          if (confirm(`Remove ${displayName} from ${activeProject.name}?`)) {
+                            removeProjectCollaborator(activeProject.id, m.userId);
+                            toast.success(`Removed ${displayName} from project`);
+                          }
+                        }}
                         className="p-1 rounded text-muted-foreground hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                        title="Remove member"
+                        title="Remove collaborator from project"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -287,18 +398,22 @@ export default function CollaborationPage() {
         </div>
       </div>
 
-      {/* INVITE TEAMMATE MODAL */}
+      {/* INVITE TEAMMATE MODAL WITH SHAREABLE LINK & ACCEPT/REJECT WORKFLOW */}
       {isInviteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-md rounded-2xl bg-white border border-black/10 shadow-2xl overflow-hidden">
+          <div className="w-full max-w-lg rounded-2xl bg-white border border-black/10 shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between p-5 border-b border-black/5 bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
                   <UserPlus className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-[#1B133C]">Invite Team Collaborator</h3>
-                  <p className="text-xs text-muted-foreground">Add engineers, designers, or reviewers</p>
+                  <h3 className="text-sm font-bold text-[#1B133C]">
+                    Invite Teammate to {activeProject?.name || 'Project'}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Provide a direct link or send an email invitation with Accept / Reject options
+                  </p>
                 </div>
               </div>
               <button
@@ -309,84 +424,125 @@ export default function CollaborationPage() {
               </button>
             </div>
 
-            <form onSubmit={handleInviteSubmit} className="p-5 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#1B133C] mb-1">Full Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Alex Rivera"
-                  value={inviteName}
-                  onChange={(e) => setInviteName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-black/10 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#1B133C] mb-1">
-                  Email Address <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="alex@company.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-black/10 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#1B133C] mb-1">Workspace Role</label>
-                  <select
-                    value={inviteRole}
-                    onChange={(e) => setInviteRole(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-lg border border-black/10 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+            <div className="p-5 space-y-5">
+              {/* SECTION 1: INSTANT SHAREABLE INVITE LINK */}
+              <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-50/80 to-purple-50/50 border border-indigo-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#1B133C] flex items-center gap-1.5">
+                    <LinkIcon className="w-3.5 h-3.5 text-indigo-600" />
+                    Direct Shareable Invite Link
+                  </span>
+                  <button
+                    type="button"
+                    disabled={isGeneratingLink}
+                    onClick={handleGenerateLink}
+                    className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
                   >
-                    <option value="developer">Developer</option>
-                    <option value="designer">Designer</option>
-                    <option value="qa">QA Engineer</option>
-                    <option value="admin">Admin</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
+                    {isGeneratingLink ? 'Generating...' : 'Generate New Link'}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Your teammate can directly open this link to view project details and click <strong>Accept</strong> or <strong>Reject</strong>.
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={generatedInviteUrl || 'Generating link...'}
+                    className="flex-1 px-3 py-2 rounded-lg bg-white border border-black/10 text-xs font-mono text-[#1B133C] select-all focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    disabled={!generatedInviteUrl}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-colors shrink-0"
+                  >
+                    {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{isCopied ? 'Copied!' : 'Copy Link'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* SECTION 2: EMAIL INVITE FORM */}
+              <form onSubmit={handleInviteSubmit} className="space-y-4 pt-1">
+                <div className="flex items-center gap-2">
+                  <div className="h-px flex-1 bg-black/5" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Or Invite by Email
+                  </span>
+                  <div className="h-px flex-1 bg-black/5" />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#1B133C] mb-1">Cursor Color</label>
-                  <div className="flex items-center gap-1.5 pt-1">
-                    {COLOR_PALETTE.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setInviteColor(c)}
-                        className={`w-6 h-6 rounded-full transition-transform ${
-                          inviteColor === c ? 'ring-2 ring-offset-2 ring-black scale-110' : 'opacity-80 hover:opacity-100'
-                        }`}
-                        style={{ backgroundColor: c }}
-                      />
-                    ))}
+                  <label className="block text-xs font-bold text-[#1B133C] mb-1">
+                    Teammate's Email Address <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="friend@company.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-black/10 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#1B133C] mb-1">Role in Project</label>
+                    <select
+                      value={inviteRole}
+                      onChange={(e) => setInviteRole(e.target.value as any)}
+                      className="w-full px-3 py-2 rounded-lg border border-black/10 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+                    >
+                      <option value="developer">Developer</option>
+                      <option value="designer">Designer</option>
+                      <option value="qa">QA Engineer</option>
+                      <option value="admin">Admin</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#1B133C] mb-1">Multiplayer Cursor Color</label>
+                    <div className="flex items-center gap-1.5 pt-1">
+                      {COLOR_PALETTE.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setInviteColor(c)}
+                          className={`w-6 h-6 rounded-full transition-transform ${
+                            inviteColor === c
+                              ? 'ring-2 ring-offset-2 ring-black scale-110'
+                              : 'opacity-80 hover:opacity-100'
+                          }`}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-black/5">
-                <button
-                  type="button"
-                  onClick={() => setIsInviteOpen(false)}
-                  className="px-3 py-2 rounded-lg border border-black/10 text-xs font-semibold text-muted-foreground hover:bg-black/5 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !inviteEmail.trim()}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-xs font-semibold text-white shadow-xs transition-colors disabled:opacity-50"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  {isSubmitting ? 'Sending Invite...' : 'Send Invitation'}
-                </button>
-              </div>
-            </form>
+                <div className="pt-3 flex items-center justify-end gap-2 border-t border-black/5">
+                  <button
+                    type="button"
+                    onClick={() => setIsInviteOpen(false)}
+                    className="px-3 py-2 rounded-lg border border-black/10 text-xs font-semibold text-muted-foreground hover:bg-black/5 transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !inviteEmail.trim()}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-xs font-semibold text-white shadow-xs transition-colors disabled:opacity-50"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    {isSubmitting ? 'Creating Invite...' : 'Send & Copy Link'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

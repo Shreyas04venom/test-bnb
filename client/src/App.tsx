@@ -39,6 +39,7 @@ import SupabaseIntegrationPage from "./pages/integrations/SupabaseIntegration";
 // Extension Auth
 import ExtensionConnectPage from "./pages/ExtensionConnect";
 import ExtensionSuccessPage from "./pages/ExtensionSuccess";
+import InviteAcceptPage from "./pages/InviteAccept";
 import NotFound from "./pages/NotFound";
 
 const CLERK_PUBLISHABLE_KEY =
@@ -50,7 +51,7 @@ const CLERK_PUBLISHABLE_KEY =
 // Automatically synchronizes Clerk profile with Axon workspace store
 function ClerkUserSync() {
   const { user, isSignedIn, isLoaded } = useUser();
-  const { switchUser, currentUser } = usePatchworkStore();
+  const { switchUser, currentUser, fetchInitialState } = usePatchworkStore();
 
   useEffect(() => {
     if (isLoaded && isSignedIn && user) {
@@ -84,14 +85,15 @@ function ClerkUserSync() {
       const connectedProviders = user.externalAccounts?.map((acc: any) => acc.provider) || [];
       const isEmailVerified = user.primaryEmailAddress?.verification?.status === "verified";
 
-      if (
+      const needsUpdate =
         !currentUser ||
         currentUser.clerkId !== user.id ||
         currentUser.email !== email ||
         currentUser.name !== name ||
         currentUser.avatar !== avatar ||
-        currentUser.githubUsername !== githubUsername
-      ) {
+        currentUser.githubUsername !== githubUsername;
+
+      if (needsUpdate) {
         switchUser({
           id: user.id,
           clerkId: user.id,
@@ -105,6 +107,8 @@ function ClerkUserSync() {
           isEmailVerified,
           connectedProviders,
         });
+        // Immediately fetch user-scoped projects
+        fetchInitialState(user.id, email);
       }
     }
   }, [isLoaded, isSignedIn, user, currentUser]);
@@ -182,6 +186,10 @@ function Router() {
       <Route path="/extension-connect" component={ExtensionConnectPage} />
       <Route path="/extension/success" component={ExtensionSuccessPage} />
       <Route path="/extension/revoke" component={ExtensionConnectPage} />
+
+      {/* Project Collaboration Invitations */}
+      <Route path="/invite/:code" component={InviteAcceptPage} />
+      <Route path="/invite" component={InviteAcceptPage} />
 
       {/* 404 Fallback */}
       <Route component={NotFound} />

@@ -14,6 +14,9 @@ import type {
   Environment,
   DeploymentProviderType,
   VersionItem,
+  Role,
+  ProjectInvite,
+  ProjectMember,
 } from '../shared/patchwork-types';
 import {
   getStore,
@@ -99,14 +102,55 @@ function createDeploymentRecord(
   };
 }
 
+export function filterProjectsForUser(projects: Project[], userId?: string, email?: string): Project[] {
+  const cleanId = userId?.trim();
+  const cleanEmail = email?.trim().toLowerCase();
+
+  // If no user identifier is provided at all, return empty array to prevent project leakage
+  if (!cleanId && !cleanEmail) {
+    return [];
+  }
+
+  return projects.filter((p) => {
+    // 1. Is direct owner by ID
+    if (cleanId && p.ownerId && p.ownerId === cleanId) return true;
+    // 2. Is direct owner by email
+    if (cleanEmail && p.ownerEmail && p.ownerEmail.toLowerCase() === cleanEmail) return true;
+    // 3. Is listed in project collaborators
+    if (Array.isArray(p.collaborators)) {
+      return p.collaborators.some((c) => {
+        if (cleanId && c.userId && c.userId === cleanId) return true;
+        if (cleanEmail && c.user?.email && c.user.email.toLowerCase() === cleanEmail) return true;
+        return false;
+      });
+    }
+    return false;
+  });
+}
+
 // ==========================================
 // 0. FULL STATE SNAPSHOT & RESET
 // ==========================================
-patchworkApiRouter.get('/state', (_req: Request, res: Response) => {
+patchworkApiRouter.get('/state', (req: Request, res: Response) => {
   const store = getStore();
+  const userId = (req.query.userId as string)?.trim() || (req.headers['x-user-id'] as string)?.trim();
+  const email = (req.query.email as string)?.trim() || (req.headers['x-user-email'] as string)?.trim();
+
+  const userProjects = filterProjectsForUser(store.projects, userId, email);
+  const userProjectIds = new Set(userProjects.map((p) => p.id));
+
+  // Scoped patches & deployments
+  const userPatches = store.patches.filter((p) => userProjectIds.has(p.projectId));
+  const userDeployments = store.deployments.filter((d) => userProjectIds.has(d.projectId));
+
   res.json({
     success: true,
-    data: store,
+    data: {
+      ...store,
+      projects: userProjects,
+      patches: userPatches,
+      deployments: userDeployments,
+    },
   });
 });
 
@@ -224,9 +268,13 @@ patchworkApiRouter.patch('/workspace', (req: Request, res: Response) => {
 // ==========================================
 // 2. PROJECTS API (/api/projects)
 // ==========================================
-patchworkApiRouter.get('/projects', (_req: Request, res: Response) => {
+patchworkApiRouter.get('/projects', (req: Request, res: Response) => {
   const store = getStore();
-  res.json({ success: true, projects: store.projects });
+  const userId = (req.query.userId as string)?.trim() || (req.headers['x-user-id'] as string)?.trim();
+  const email = (req.query.email as string)?.trim() || (req.headers['x-user-email'] as string)?.trim();
+
+  const userProjects = filterProjectsForUser(store.projects, userId, email);
+  res.json({ success: true, projects: userProjects });
 });
 
 patchworkApiRouter.get('/projects/:id', (req: Request, res: Response) => {
@@ -324,8 +372,30 @@ patchworkApiRouter.post('/projects', (req: Request, res: Response) => {
   }
 
   const store = getStore();
+  const ownerId = (req.body.ownerId as string)?.trim() || store.currentUser.id;
+  const ownerEmail = (req.body.ownerEmail as string)?.trim() || store.currentUser.email;
+  const ownerName = (req.body.ownerName as string)?.trim() || store.currentUser.name;
+  const projectId = `proj-${Date.now()}`;
+
+  const ownerMember: ProjectMember = {
+    id: `collab-${Date.now()}`,
+    projectId,
+    userId: ownerId,
+    user: {
+      id: ownerId,
+      name: ownerName,
+      email: ownerEmail,
+      avatar: (req.body.ownerAvatar as string)?.trim() || store.currentUser.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(ownerName)}`,
+      role: 'owner',
+      cursorColor: '#6366F1',
+      timezone: 'UTC',
+    },
+    role: 'owner',
+    joinedAt: new Date().toISOString(),
+  };
+
   const newProject: Project = {
-    id: `proj-${Date.now()}`,
+    id: projectId,
     workspaceId: store.workspace.id,
     name: parsed.data.name,
     slug: parsed.data.slug,
@@ -339,6 +409,10 @@ patchworkApiRouter.post('/projects', (req: Request, res: Response) => {
     defaultBranch: 'main',
     status: 'production_healthy',
     ownershipStatus: 'verified',
+    ownerId,
+    ownerEmail,
+    ownerName,
+    collaborators: [ownerMember],
     verifiedAt: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -348,7 +422,7 @@ patchworkApiRouter.post('/projects', (req: Request, res: Response) => {
   pushAudit('PROJECT_CREATED', {
     projectId: newProject.id,
     projectName: newProject.name,
-    metadata: { repo: newProject.repositoryName, url: newProject.productionUrl },
+    metadata: { repo: newProject.repositoryName, url: newProject.productionUrl, ownerEmail },
   }, req);
 
   saveStore();
@@ -396,6 +470,208 @@ patchworkApiRouter.delete('/projects/:id', (req: Request, res: Response) => {
     saveStore();
   }
   res.json({ success: true, message: 'Project deleted' });
+});
+
+// ==========================================
+// PROJECT INVITES & COLLABORATORS API
+// ==========================================
+
+// POST /api/projects/:id/invites -> Create a shareable invite link/code
+patchworkApiRouter.post('/projects/:id/invites', (req: Request, res: Response) => {
+  const store = getStore();
+  const project = store.projects.find((p) => p.id === req.params.id);
+  if (!project) {
+    return res.status(404).json({ success: false, error: 'Project not found' });
+  }
+
+  const { inviteeEmail, role, inviterId, inviterName, inviterEmail } = req.body || {};
+  const code = Math.random().toString(36).substring(2, 10);
+  const invite: ProjectInvite = {
+    id: `inv-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    code,
+    projectId: project.id,
+    projectName: project.name,
+    inviterId: inviterId || store.currentUser.id,
+    inviterName: inviterName || store.currentUser.name,
+    inviterEmail: inviterEmail || store.currentUser.email,
+    inviteeEmail: inviteeEmail?.trim() || undefined,
+    role: (role as Role) || 'developer',
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  };
+
+  store.invites.unshift(invite);
+  saveStore();
+
+  pushAudit('INVITATION_SENT', {
+    projectId: project.id,
+    projectName: project.name,
+    metadata: { inviteCode: code, inviteeEmail, role: invite.role },
+  }, req);
+
+  res.status(201).json({
+    success: true,
+    invite,
+    code,
+    inviteUrl: `/invite/${code}`,
+  });
+});
+
+// GET /api/invites/:code -> Get invite details for the acceptance page
+patchworkApiRouter.get('/invites/:code', (req: Request, res: Response) => {
+  const store = getStore();
+  const invite = store.invites.find((i) => i.code === req.params.code);
+  if (!invite) {
+    return res.status(404).json({ success: false, error: 'Invitation not found or has expired' });
+  }
+
+  const project = store.projects.find((p) => p.id === invite.projectId);
+  if (!project) {
+    return res.status(404).json({ success: false, error: 'The project for this invitation no longer exists' });
+  }
+
+  res.json({
+    success: true,
+    invite,
+    project: {
+      id: project.id,
+      name: project.name,
+      framework: project.framework,
+      repositoryName: project.repositoryName,
+      productionUrl: project.productionUrl,
+      ownerName: project.ownerName,
+      ownerEmail: project.ownerEmail,
+    },
+  });
+});
+
+// POST /api/invites/:code/accept -> Accept invitation
+patchworkApiRouter.post('/invites/:code/accept', (req: Request, res: Response) => {
+  const store = getStore();
+  const invite = store.invites.find((i) => i.code === req.params.code);
+  if (!invite) {
+    return res.status(404).json({ success: false, error: 'Invitation not found or expired' });
+  }
+
+  if (invite.status === 'declined') {
+    return res.status(400).json({ success: false, error: 'This invitation was previously declined' });
+  }
+
+  const project = store.projects.find((p) => p.id === invite.projectId);
+  if (!project) {
+    return res.status(404).json({ success: false, error: 'Project not found' });
+  }
+
+  const { userId, name, email, avatar } = req.body || {};
+  const memberId = userId || `usr-${Date.now()}`;
+  const memberEmail = email?.trim() || invite.inviteeEmail || '';
+  const memberName = name?.trim() || (memberEmail ? memberEmail.split('@')[0] : 'Collaborator');
+
+  if (!project.collaborators) {
+    project.collaborators = [];
+  }
+
+  // Check if already in collaborators
+  const existingIndex = project.collaborators.findIndex(
+    (c) => (userId && c.userId === userId) || (memberEmail && c.user?.email?.toLowerCase() === memberEmail.toLowerCase())
+  );
+
+  const colors = ['#6366F1', '#EC4899', '#10B981', '#F59E0B', '#3B82F6', '#8B5CF6'];
+  const assignedColor = colors[project.collaborators.length % colors.length];
+
+  if (existingIndex >= 0) {
+    project.collaborators[existingIndex].role = invite.role;
+  } else {
+    project.collaborators.push({
+      id: `collab-${Date.now()}`,
+      projectId: project.id,
+      userId: memberId,
+      user: {
+        id: memberId,
+        name: memberName,
+        email: memberEmail,
+        avatar: avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(memberName)}`,
+        role: invite.role,
+        cursorColor: assignedColor,
+        timezone: 'UTC',
+      },
+      role: invite.role,
+      joinedAt: new Date().toISOString(),
+    });
+  }
+
+  invite.status = 'accepted';
+  invite.acceptedAt = new Date().toISOString();
+
+  pushAudit('COLLABORATOR_INVITED', {
+    projectId: project.id,
+    projectName: project.name,
+    metadata: { action: 'INVITE_ACCEPTED', email: memberEmail, role: invite.role, inviteCode: invite.code },
+  }, req);
+
+  saveStore();
+
+  res.json({
+    success: true,
+    message: `You have successfully joined ${project.name}!`,
+    project,
+    invite,
+  });
+});
+
+// POST /api/invites/:code/decline -> Decline invitation
+patchworkApiRouter.post('/invites/:code/decline', (req: Request, res: Response) => {
+  const store = getStore();
+  const invite = store.invites.find((i) => i.code === req.params.code);
+  if (!invite) {
+    return res.status(404).json({ success: false, error: 'Invitation not found or expired' });
+  }
+
+  invite.status = 'declined';
+  saveStore();
+
+  res.json({
+    success: true,
+    message: 'Invitation declined.',
+    invite,
+  });
+});
+
+// GET /api/projects/:id/invites -> List invites for this project
+patchworkApiRouter.get('/projects/:id/invites', (req: Request, res: Response) => {
+  const store = getStore();
+  const projectInvites = store.invites.filter((i) => i.projectId === req.params.id);
+  res.json({ success: true, invites: projectInvites });
+});
+
+// DELETE /api/invites/:id -> Revoke pending invite
+patchworkApiRouter.delete('/invites/:id', (req: Request, res: Response) => {
+  const store = getStore();
+  const idx = store.invites.findIndex((i) => i.id === req.params.id || i.code === req.params.id);
+  if (idx !== -1) {
+    store.invites.splice(idx, 1);
+    saveStore();
+  }
+  res.json({ success: true, message: 'Invite revoked' });
+});
+
+// DELETE /api/projects/:projectId/collaborators/:userId -> Remove collaborator from project
+patchworkApiRouter.delete('/projects/:projectId/collaborators/:userId', (req: Request, res: Response) => {
+  const store = getStore();
+  const project = store.projects.find((p) => p.id === req.params.projectId);
+  if (!project) {
+    return res.status(404).json({ success: false, error: 'Project not found' });
+  }
+
+  if (Array.isArray(project.collaborators)) {
+    const idx = project.collaborators.findIndex((c) => c.userId === req.params.userId);
+    if (idx !== -1) {
+      project.collaborators.splice(idx, 1);
+      saveStore();
+    }
+  }
+
+  res.json({ success: true, message: 'Collaborator removed from project', project });
 });
 
 // ==========================================
@@ -899,9 +1175,10 @@ patchworkApiRouter.post('/extension/presence', (req: Request, res: Response) => 
   res.json({ success: true, timestamp: Date.now() });
 });
 
-// GET /api/extension/presence -> Get all active team presence records
-patchworkApiRouter.get('/extension/presence', (_req: Request, res: Response) => {
-  const active = getActivePresence();
+// GET /api/extension/presence -> Get all active team presence records (can be scoped to projectId)
+patchworkApiRouter.get('/extension/presence', (req: Request, res: Response) => {
+  const projectId = (req.query.projectId as string)?.trim() || undefined;
+  const active = getActivePresence(projectId);
   res.json({
     success: true,
     presence: active,

@@ -331,28 +331,80 @@ export function DashboardLayout({ children, title, subtitle, actions }: Dashboar
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-64 glass-dropdown border border-white/60">
-                <DropdownMenuLabel className="text-xs text-muted-foreground">Projects</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Your Projects</DropdownMenuLabel>
                 {projects.length > 0 ? (
-                  projects.map((p) => (
-                    <DropdownMenuItem
-                      key={p.id}
-                      onClick={() => setActiveProject(p.id)}
-                      className="text-xs flex items-center justify-between"
-                    >
-                      <div>
-                        <p className="font-semibold">{p.name}</p>
-                        <p className="text-[10px] text-muted-foreground">{p.repositoryName}</p>
-                      </div>
-                      {p.id === activeProjectId && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
-                    </DropdownMenuItem>
-                  ))
+                  projects.map((p) => {
+                    const collabCount = p.collaborators ? p.collaborators.length : 1;
+                    return (
+                      <DropdownMenuItem
+                        key={p.id}
+                        onClick={() => setActiveProject(p.id)}
+                        className="text-xs flex items-center justify-between"
+                      >
+                        <div>
+                          <p className="font-semibold">{p.name}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {p.repositoryName} • {collabCount} {collabCount === 1 ? 'member' : 'members'}
+                          </p>
+                        </div>
+                        {p.id === activeProjectId && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                      </DropdownMenuItem>
+                    );
+                  })
                 ) : (
                   <div className="p-3 text-center text-xs text-muted-foreground">
-                    No projects created yet.
+                    No projects yet. Create a project to get started.
                   </div>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Project-Scoped Multiplayer Presence & Member Badges */}
+            {activeProject && projects.length > 0 && (
+              <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-black/10">
+                <div className="flex -space-x-1.5 overflow-hidden">
+                  {(activeProject.collaborators && activeProject.collaborators.length > 0
+                    ? activeProject.collaborators
+                    : [
+                        {
+                          id: 'owner',
+                          user: {
+                            name: activeProject.ownerName || displayName,
+                            avatar: displayAvatar,
+                          },
+                          role: 'owner',
+                        },
+                      ]
+                  )
+                    .slice(0, 4)
+                    .map((c: any, i: number) => (
+                      <img
+                        key={c.id || i}
+                        src={
+                          c.user?.avatar ||
+                          `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+                            c.user?.name || 'Member'
+                          )}`
+                        }
+                        alt={c.user?.name || 'Member'}
+                        title={`${c.user?.name || 'Member'} (${c.role || 'Member'})`}
+                        className="inline-block h-6 w-6 rounded-full ring-2 ring-white object-cover"
+                      />
+                    ))}
+                </div>
+                <Link
+                  href="/collaboration"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-indigo-600 px-1.5 py-0.5 rounded hover:bg-black/5 transition-colors"
+                  title="Multiplayer roster for this project"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>
+                    {activeProject.collaborators ? activeProject.collaborators.length : 1} in project
+                  </span>
+                  <span className="text-indigo-600 font-semibold ml-0.5">+ Invite</span>
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Right Controls */}

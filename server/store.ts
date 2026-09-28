@@ -13,6 +13,7 @@ import type {
   ConflictItem,
   User,
   VersionItem,
+  ProjectInvite,
 } from '../shared/patchwork-types';
 
 export interface PresenceRecord {
@@ -52,6 +53,7 @@ export interface AxonStoreData {
   conflicts: ConflictItem[];
   integrations: IntegrationsConfig;
   versions: VersionItem[];
+  invites: ProjectInvite[];
 }
 
 const DATA_DIR = path.resolve(process.cwd(), 'server', 'data');
@@ -103,6 +105,7 @@ const DEFAULT_STORE: AxonStoreData = {
   auditLogs: [],
   conflicts: [],
   versions: [],
+  invites: [],
   integrations: {
     github: {
       connected: false,
@@ -181,6 +184,7 @@ export function loadStore(): AxonStoreData {
           ai: { ...DEFAULT_STORE.integrations.ai, ...(parsed.integrations?.ai || {}) },
         },
         versions: Array.isArray(parsed.versions) && parsed.versions.length > 0 ? parsed.versions : DEFAULT_VERSIONS,
+        invites: Array.isArray(parsed.invites) ? parsed.invites : [],
       };
       return storeData;
     }

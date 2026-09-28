@@ -3,23 +3,144 @@
     "id": "ws-prod-1",
     "name": "Axon Production Workspace",
     "slug": "axon-prod",
-    "ownerId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
+    "ownerId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
     "plan": "Enterprise",
     "membersCount": 3,
     "createdAt": "2026-09-28T13:42:47.195Z",
     "setupCompleted": true
   },
   "currentUser": {
-    "id": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
-    "name": "tapu",
-    "email": "tapu3983@gmail.com",
-    "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZvUWpSN2JwSXBWdDc1aUV4UjRIcmVRT04ifQ",
+    "id": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+    "name": "vivan",
+    "email": "vivanshetty45@gmail.com",
+    "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZiQmk1Mk96aTZQWXVqYWV6TTZzV25ScTQifQ",
     "role": "owner",
     "cursorColor": "#6366F1",
     "timezone": "Asia/Calcutta",
-    "clerkId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh"
+    "clerkId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+    "githubUsername": "codevivan"
   },
   "projects": [
+    {
+      "id": "proj-1790620936435",
+      "workspaceId": "ws-prod-1",
+      "name": "CertGuard",
+      "slug": "certguard",
+      "productionUrl": "https://cert-guard.vercel.app",
+      "framework": "Next.js",
+      "repositoryId": "repo-1790620936435",
+      "repositoryName": "codevivan/CertGuard",
+      "repositoryUrl": "https://github.com/codevivan/CertGuard",
+      "deploymentProvider": "vercel",
+      "deploymentProjectId": "deploy_prj_1790620936435",
+      "defaultBranch": "main",
+      "status": "production_healthy",
+      "ownershipStatus": "verified",
+      "ownerId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+      "ownerEmail": "vivanshetty45@gmail.com",
+      "ownerName": "vivan",
+      "collaborators": [
+        {
+          "id": "collab-cert-1",
+          "projectId": "proj-1790620936435",
+          "userId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+          "user": {
+            "id": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+            "name": "vivan",
+            "email": "vivanshetty45@gmail.com",
+            "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZiQmk1Mk96aTZQWXVqYWV6TTZzV25ScTQifQ",
+            "role": "owner",
+            "cursorColor": "#6366F1",
+            "timezone": "Asia/Calcutta"
+          },
+          "role": "owner",
+          "joinedAt": "2026-09-28T18:42:16.435Z"
+        }
+      ],
+      "verifiedAt": "2026-09-28T18:42:16.435Z",
+      "createdAt": "2026-09-28T18:42:16.435Z",
+      "updatedAt": "2026-09-28T18:42:16.435Z"
+    },
+    {
+      "id": "proj-1790620916375",
+      "workspaceId": "ws-prod-1",
+      "name": "Styler2",
+      "slug": "styler2",
+      "productionUrl": "",
+      "framework": "Next.js",
+      "repositoryId": "repo-1790620916375",
+      "repositoryName": "TuhinJalui/Styler2",
+      "repositoryUrl": "https://github.com/TuhinJalui/Styler2",
+      "deploymentProvider": "vercel",
+      "deploymentProjectId": "deploy_prj_1790620916375",
+      "defaultBranch": "main",
+      "status": "production_healthy",
+      "ownershipStatus": "verified",
+      "ownerId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+      "ownerEmail": "vivanshetty45@gmail.com",
+      "ownerName": "vivan",
+      "collaborators": [
+        {
+          "id": "collab-style-1",
+          "projectId": "proj-1790620916375",
+          "userId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+          "user": {
+            "id": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+            "name": "vivan",
+            "email": "vivanshetty45@gmail.com",
+            "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZiQmk1Mk96aTZQWXVqYWV6TTZzV25ScTQifQ",
+            "role": "owner",
+            "cursorColor": "#6366F1",
+            "timezone": "Asia/Calcutta"
+          },
+          "role": "owner",
+          "joinedAt": "2026-09-28T18:41:56.375Z"
+        }
+      ],
+      "verifiedAt": "2026-09-28T18:41:56.375Z",
+      "createdAt": "2026-09-28T18:41:56.375Z",
+      "updatedAt": "2026-09-28T18:41:56.375Z"
+    },
+    {
+      "id": "proj-1790620814341",
+      "workspaceId": "ws-prod-1",
+      "name": "FinQuest",
+      "slug": "finquest",
+      "productionUrl": "https://hook-shush-37808004.figma.site/",
+      "framework": "Next.js",
+      "repositoryId": "repo-1790620814341",
+      "repositoryName": "TuhinJalui/FinQuest",
+      "repositoryUrl": "https://github.com/TuhinJalui/FinQuest",
+      "deploymentProvider": "vercel",
+      "deploymentProjectId": "deploy_prj_1790620814341",
+      "defaultBranch": "main",
+      "status": "production_healthy",
+      "ownershipStatus": "verified",
+      "ownerId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
+      "ownerEmail": "tapu3983@gmail.com",
+      "ownerName": "tapu",
+      "collaborators": [
+        {
+          "id": "collab-fin-1",
+          "projectId": "proj-1790620814341",
+          "userId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
+          "user": {
+            "id": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
+            "name": "tapu",
+            "email": "tapu3983@gmail.com",
+            "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZvUWpSN2JwSXBWdDc1aUV4UjRIcmVRT04ifQ",
+            "role": "owner",
+            "cursorColor": "#10B981",
+            "timezone": "Asia/Calcutta"
+          },
+          "role": "owner",
+          "joinedAt": "2026-09-28T18:40:14.341Z"
+        }
+      ],
+      "verifiedAt": "2026-09-28T18:40:14.341Z",
+      "createdAt": "2026-09-28T18:40:14.341Z",
+      "updatedAt": "2026-09-28T18:40:14.341Z"
+    },
     {
       "id": "proj-1790615624295",
       "workspaceId": "ws-prod-1",
@@ -35,6 +156,27 @@
       "defaultBranch": "main",
       "status": "production_healthy",
       "ownershipStatus": "verified",
+      "ownerId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
+      "ownerEmail": "tapu3983@gmail.com",
+      "ownerName": "tapu",
+      "collaborators": [
+        {
+          "id": "collab-silence-1",
+          "projectId": "proj-1790615624295",
+          "userId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
+          "user": {
+            "id": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
+            "name": "tapu",
+            "email": "tapu3983@gmail.com",
+            "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZvUWpSN2JwSXBWdDc1aUV4UjRIcmVRT04ifQ",
+            "role": "owner",
+            "cursorColor": "#10B981",
+            "timezone": "Asia/Calcutta"
+          },
+          "role": "owner",
+          "joinedAt": "2026-09-28T17:13:44.298Z"
+        }
+      ],
       "verifiedAt": "2026-09-28T17:13:44.297Z",
       "createdAt": "2026-09-28T17:13:44.298Z",
       "updatedAt": "2026-09-28T17:13:44.298Z"
@@ -98,16 +240,17 @@
     {
       "id": "mem-1",
       "workspaceId": "ws-prod-1",
-      "userId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
+      "userId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
       "user": {
-        "id": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
-        "name": "tapu",
-        "email": "tapu3983@gmail.com",
-        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZvUWpSN2JwSXBWdDc1aUV4UjRIcmVRT04ifQ",
+        "id": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "name": "vivan",
+        "email": "vivanshetty45@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZiQmk1Mk96aTZQWXVqYWV6TTZzV25ScTQifQ",
         "role": "owner",
         "cursorColor": "#6366F1",
         "timezone": "Asia/Calcutta",
-        "clerkId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh"
+        "clerkId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "githubUsername": "codevivan"
       },
       "role": "owner",
       "joinedAt": "2026-09-28T13:42:47.234Z",
@@ -175,6 +318,80 @@
   ],
   "verifications": [],
   "auditLogs": [
+    {
+      "id": "aud-1790620936435-0jbm",
+      "action": "PROJECT_CREATED",
+      "user": {
+        "id": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "name": "vivan",
+        "email": "vivanshetty45@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZiQmk1Mk96aTZQWXVqYWV6TTZzV25ScTQifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "githubUsername": "codevivan"
+      },
+      "timestamp": "2026-09-28T18:42:16.435Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+      "result": "success",
+      "metadata": {
+        "repo": "codevivan/CertGuard",
+        "url": "https://cert-guard.vercel.app"
+      },
+      "projectId": "proj-1790620936435",
+      "projectName": "CertGuard"
+    },
+    {
+      "id": "aud-1790620916375-jrfe",
+      "action": "PROJECT_CREATED",
+      "user": {
+        "id": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "name": "vivan",
+        "email": "vivanshetty45@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZiQmk1Mk96aTZQWXVqYWV6TTZzV25ScTQifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "githubUsername": "codevivan"
+      },
+      "timestamp": "2026-09-28T18:41:56.375Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+      "result": "success",
+      "metadata": {
+        "repo": "TuhinJalui/Styler2",
+        "url": ""
+      },
+      "projectId": "proj-1790620916375",
+      "projectName": "Styler2"
+    },
+    {
+      "id": "aud-1790620814341-7cye",
+      "action": "PROJECT_CREATED",
+      "user": {
+        "id": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh",
+        "name": "tapu",
+        "email": "tapu3983@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZvUWpSN2JwSXBWdDc1aUV4UjRIcmVRT04ifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVoQiSzvWlYwMbQ2RIctnosgGh"
+      },
+      "timestamp": "2026-09-28T18:40:14.341Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+      "result": "success",
+      "metadata": {
+        "repo": "TuhinJalui/FinQuest",
+        "url": "https://hook-shush-37808004.figma.site/"
+      },
+      "projectId": "proj-1790620814341",
+      "projectName": "FinQuest"
+    },
     {
       "id": "aud-1790615624298-fve0",
       "action": "PROJECT_CREATED",
@@ -252,6 +469,7 @@
       "rollbackPossible": true
     }
   ],
+  "invites": [],
   "integrations": {
     "github": {
       "connected": false,

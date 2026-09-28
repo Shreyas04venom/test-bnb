@@ -115,7 +115,7 @@ export interface PatchworkStoreState {
   isLoading: boolean;
 
   // Sync with Server API
-  fetchInitialState: () => Promise<void>;
+  fetchInitialState: (overrideUserId?: string, overrideUserEmail?: string) => Promise<void>;
   seedStarterProject: () => Promise<void>;
   clearAllSampleData: () => Promise<void>;
   syncPresence: () => Promise<void>;
@@ -132,6 +132,10 @@ export interface PatchworkStoreState {
   createProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'workspaceId'>) => Promise<Project>;
   verifyProjectOwnership: (projectId: string) => Promise<void>;
   deleteProject: (projectId: string) => Promise<void>;
+  createProjectInvite: (projectId: string, role?: string, inviteeEmail?: string) => Promise<{ invite: any; code: string; inviteUrl: string } | null>;
+  acceptProjectInvite: (code: string, userData?: { id?: string; name?: string; email?: string; avatar?: string }) => Promise<{ success: boolean; project?: Project; error?: string }>;
+  declineProjectInvite: (code: string) => Promise<boolean>;
+  removeProjectCollaborator: (projectId: string, userId: string) => Promise<void>;
 
   // Patch actions
   createPatch: (patch: Partial<Patch> & { title: string; projectId: string }) => Promise<Patch>;
@@ -236,24 +240,42 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
       pairingExpiresAt: null,
       isLoading: false,
 
-      fetchInitialState: async () => {
+      fetchInitialState: async (overrideUserId?: string, overrideUserEmail?: string) => {
         try {
           set({ isLoading: true });
-          const res = await fetch('/api/state');
+          const curUser = get().currentUser;
+          const userId = overrideUserId || curUser?.id || curUser?.clerkId;
+          const userEmail = overrideUserEmail || curUser?.email;
+
+          const params = new URLSearchParams();
+          if (userId) params.set('userId', userId);
+          if (userEmail) params.set('email', userEmail);
+          const queryString = params.toString() ? `?${params.toString()}` : '';
+
+          const res = await fetch(`/api/state${queryString}`, {
+            headers: {
+              ...(userId ? { 'x-user-id': userId } : {}),
+              ...(userEmail ? { 'x-user-email': userEmail } : {}),
+            },
+          });
           if (res.ok) {
             const json = await res.json();
             if (json.success && json.data) {
               const d = json.data;
               const curIntegrations = get().integrations;
-              const curUser = get().currentUser;
               // If user is already authenticated via Clerk, keep their Clerk credentials
               const isClerkAuth = Boolean(curUser?.clerkId || (curUser?.id && curUser.id.startsWith('user_')));
               const resolvedUser = isClerkAuth ? curUser : (d.currentUser || curUser);
 
+              const currentActive = get().activeProjectId;
+              const projectsList = d.projects || [];
+              const hasActiveProject = projectsList.some((p: Project) => p.id === currentActive);
+              const resolvedActiveProject = hasActiveProject ? currentActive : (projectsList[0]?.id || '');
+
               set({
                 workspace: d.workspace ? { ...get().workspace, ...d.workspace } : get().workspace,
                 currentUser: resolvedUser,
-                projects: d.projects || [],
+                projects: projectsList,
                 patches: d.patches || [],
                 members: (d.collaborators || get().members).map((m: WorkspaceMember) => {
                   if ((m.role === 'owner' || m.id === 'mem-1') && resolvedUser) {
@@ -275,7 +297,7 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
                   supabase: { ...curIntegrations.supabase, ...(d.integrations?.supabase || {}) },
                   ai: { ...curIntegrations.ai, ...(d.integrations?.ai || {}) },
                 },
-                activeProjectId: d.projects?.[0]?.id || '',
+                activeProjectId: resolvedActiveProject,
               });
             }
           }
@@ -349,7 +371,11 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
 
       syncPresence: async () => {
         try {
-          const res = await fetch('/api/extension/presence');
+          const activeProjectId = get().activeProjectId;
+          const url = activeProjectId
+            ? `/api/extension/presence?projectId=${encodeURIComponent(activeProjectId)}`
+            : '/api/extension/presence';
+          const res = await fetch(url);
           if (res.ok) {
             const json = await res.json();
             if (json.success && Array.isArray(json.presence)) {
@@ -360,6 +386,7 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
                   avatar: p.userAvatar || `https://api.dicebear.com/7.x/initials/svg?seed=${p.userName}`,
                   cursorColor: p.userColor || '#6366F1',
                   currentRoute: p.route || '/',
+                  currentProject: p.projectId || '',
                   selectedElement: p.selectedElement || null,
                   lastSeen: 'Just now',
                   cursorPosition: { x: p.cursorX || 50, y: p.cursorY || 50 },
@@ -432,11 +459,20 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
       },
 
       createProject: async (data) => {
+        const curUser = get().currentUser;
+        const payload = {
+          ...data,
+          ownerId: curUser?.id,
+          ownerEmail: curUser?.email,
+          ownerName: curUser?.name,
+          ownerAvatar: curUser?.avatar,
+        };
+
         try {
           const res = await fetch('/api/projects', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
+            body: JSON.stringify(payload),
           });
           if (res.ok) {
             const json = await res.json();
@@ -462,6 +498,9 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
           updatedAt: new Date().toISOString(),
           ownershipStatus: 'verified',
           status: 'production_healthy',
+          ownerId: curUser?.id,
+          ownerEmail: curUser?.email,
+          ownerName: curUser?.name,
         };
         set((state) => ({
           projects: [newProj, ...state.projects],
@@ -505,6 +544,96 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
         });
         try {
           await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
+        } catch {
+          // ignore
+        }
+      },
+
+      createProjectInvite: async (projectId: string, role = 'developer', inviteeEmail?: string) => {
+        const user = get().currentUser || INITIAL_USER;
+        try {
+          const res = await fetch(`/api/projects/${projectId}/invites`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              role,
+              inviteeEmail,
+              inviterId: user.id,
+              inviterName: user.name,
+              inviterEmail: user.email,
+            }),
+          });
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success) {
+              return { invite: json.invite, code: json.code, inviteUrl: json.inviteUrl };
+            }
+          }
+        } catch (err) {
+          console.warn('[PatchworkStore] createProjectInvite failed:', err);
+        }
+        return null;
+      },
+
+      acceptProjectInvite: async (code: string, userData?: { id?: string; name?: string; email?: string; avatar?: string }) => {
+        const curUser = get().currentUser || INITIAL_USER;
+        const payload = {
+          userId: userData?.id || curUser.id,
+          name: userData?.name || curUser.name,
+          email: userData?.email || curUser.email,
+          avatar: userData?.avatar || curUser.avatar,
+        };
+
+        try {
+          const res = await fetch(`/api/invites/${code}/accept`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const json = await res.json();
+          if (res.ok && json.success && json.project) {
+            const project: Project = json.project;
+            set((state) => {
+              const existingIdx = state.projects.findIndex((p) => p.id === project.id);
+              const newProjects = existingIdx >= 0
+                ? state.projects.map((p, i) => (i === existingIdx ? project : p))
+                : [project, ...state.projects];
+              return {
+                projects: newProjects,
+                activeProjectId: project.id,
+              };
+            });
+            return { success: true, project };
+          }
+          return { success: false, error: json.error || 'Failed to accept invitation' };
+        } catch (err: any) {
+          return { success: false, error: err.message || 'Network error' };
+        }
+      },
+
+      declineProjectInvite: async (code: string) => {
+        try {
+          const res = await fetch(`/api/invites/${code}/decline`, { method: 'POST' });
+          const json = await res.json();
+          return Boolean(json.success);
+        } catch {
+          return false;
+        }
+      },
+
+      removeProjectCollaborator: async (projectId: string, userId: string) => {
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === projectId
+              ? {
+                  ...p,
+                  collaborators: p.collaborators?.filter((c) => c.userId !== userId),
+                }
+              : p
+          ),
+        }));
+        try {
+          await fetch(`/api/projects/${projectId}/collaborators/${userId}`, { method: 'DELETE' });
         } catch {
           // ignore
         }

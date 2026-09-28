@@ -40,6 +40,30 @@ export type DeploymentProviderType = 'vercel' | 'netlify' | 'custom';
 export type ProjectStatus = 'production_healthy' | 'degraded' | 'building' | 'unverified';
 export type OwnershipStatus = 'verified' | 'pending' | 'failed';
 
+export interface ProjectMember {
+  id: string;
+  projectId: string;
+  userId: string;
+  user: User;
+  role: Role;
+  joinedAt: string;
+}
+
+export interface ProjectInvite {
+  id: string;
+  code: string;
+  projectId: string;
+  projectName: string;
+  inviterId: string;
+  inviterName: string;
+  inviterEmail: string;
+  inviteeEmail?: string;
+  role: Role;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: string;
+  acceptedAt?: string;
+}
+
 export interface Project {
   id: string;
   workspaceId: string;
@@ -55,6 +79,10 @@ export interface Project {
   defaultBranch: string;
   status: ProjectStatus;
   ownershipStatus: OwnershipStatus;
+  ownerId?: string;
+  ownerEmail?: string;
+  ownerName?: string;
+  collaborators?: ProjectMember[];
   verifiedAt?: string;
   txtVerificationToken?: string;
   createdAt: string;
