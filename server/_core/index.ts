@@ -9,9 +9,8 @@ import { patchworkApiRouter } from "../patchworkApi";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 
-async function startServer() {
+export function createServerApp() {
   const app = express();
-  const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -30,6 +29,13 @@ async function startServer() {
       createContext,
     })
   );
+  return app;
+}
+
+export const app = createServerApp();
+
+async function startServer() {
+  const server = createServer(app);
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
@@ -43,4 +49,7 @@ async function startServer() {
   server.listen(port, "0.0.0.0", () => console.log(`Server listening on port ${port}`));
 }
 
-startServer().catch(error => { console.error(error); process.exit(1); });
+// Only start standalone listener when not running inside Vercel Serverless
+if (!process.env.VERCEL) {
+  startServer().catch(error => { console.error(error); process.exit(1); });
+}
