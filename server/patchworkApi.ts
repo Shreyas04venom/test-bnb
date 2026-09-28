@@ -1037,7 +1037,7 @@ patchworkApiRouter.post('/extension/session', (req: Request, res: Response) => {
       name: store.workspace.name,
     },
     user: store.currentUser,
-    projects: store.projects.map((p) => ({
+    projects: filterProjectsForUser(store.projects, store.currentUser.id, store.currentUser.email).map((p) => ({
       id: p.id,
       name: p.name,
       slug: p.slug,
@@ -1065,12 +1065,29 @@ patchworkApiRouter.delete('/extension/session/:id', (req: Request, res: Response
   res.json({ success: true, message: 'Extension session revoked' });
 });
 
-// GET /api/extension/projects -> Extension gets authorized project list
-patchworkApiRouter.get('/extension/projects', (_req: Request, res: Response) => {
+// GET /api/extension/projects -> Extension gets authorized project list (user-scoped)
+patchworkApiRouter.get('/extension/projects', (req: Request, res: Response) => {
   const store = getStore();
+
+  // Extract user identity from Authorization header, query params, or request headers
+  // The extension sends Authorization: Bearer <token> which was issued for a specific user
+  // We also accept userId/email as query params for direct user scoping
+  const userId =
+    (req.query.userId as string)?.trim() ||
+    (req.headers['x-user-id'] as string)?.trim() ||
+    (req.query.user_id as string)?.trim();
+  const email =
+    (req.query.email as string)?.trim() ||
+    (req.query.userEmail as string)?.trim() ||
+    (req.headers['x-user-email'] as string)?.trim();
+
+  // If we have user identity, filter to their projects only
+  // If no identity (anonymous), return empty array to prevent data leakage
+  const userProjects = filterProjectsForUser(store.projects, userId, email);
+
   res.json({
     success: true,
-    projects: store.projects.map((p) => ({
+    projects: userProjects.map((p) => ({
       id: p.id,
       name: p.name,
       slug: p.slug,

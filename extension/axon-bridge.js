@@ -105,20 +105,40 @@
     }
   });
 
-  // Fetch verified projects from Axon server
+  // Fetch verified projects from Axon server (user-scoped)
   async function fetchProjects() {
     if (!currentAuth.serverUrl) return [];
     try {
-      const res = await fetch(`${currentAuth.serverUrl}/api/extension/projects`, {
-        headers: currentAuth.token ? { Authorization: `Bearer ${currentAuth.token}` } : {},
-      });
+      // Build query params with user identity so the server returns only THIS user's projects
+      const params = new URLSearchParams();
+      const userId = currentAuth.user?.id || currentAuth.user?.clerkId;
+      const email = currentAuth.user?.email;
+      if (userId) params.set('userId', userId);
+      if (email) params.set('email', email);
+      const qs = params.toString() ? `?${params.toString()}` : '';
+
+      const headers = {};
+      if (currentAuth.token) headers['Authorization'] = `Bearer ${currentAuth.token}`;
+      if (userId) headers['x-user-id'] = userId;
+      if (email) headers['x-user-email'] = email;
+
+      const res = await fetch(`${currentAuth.serverUrl}/api/extension/projects${qs}`, { headers });
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.projects)) {
           currentAuth.projects = json.projects;
-          if (!currentAuth.activeProjectId && json.projects.length > 0) {
+
+          if (json.projects.length === 0) {
+            // User has no projects — clear any stale selection
+            currentAuth.activeProjectId = null;
+          } else if (!currentAuth.activeProjectId) {
+            // Only auto-select if user has at least one project AND nothing is selected yet
+            currentAuth.activeProjectId = json.projects[0].id;
+          } else if (!json.projects.some(p => p.id === currentAuth.activeProjectId)) {
+            // Previously selected project no longer belongs to user — reset
             currentAuth.activeProjectId = json.projects[0].id;
           }
+
           await saveAuth();
           return json.projects;
         }
@@ -184,13 +204,15 @@
         throw new Error(json?.error?.message || json?.error || 'Invalid or expired pairing code.');
       }
 
+      const userProjects = json.projects || [];
       currentAuth = {
         token: json.accessToken,
         serverUrl,
         workspace: json.workspace,
         user: json.user,
-        activeProjectId: json.projects?.[0]?.id || null,
-        projects: json.projects || [],
+        // Only auto-select if user actually has projects
+        activeProjectId: userProjects.length > 0 ? userProjects[0].id : null,
+        projects: userProjects,
       };
 
       await saveAuth();
@@ -747,15 +769,19 @@
       statusText.style.color = '#34D399';
 
       connectBtn.style.display = 'none';
-      publishBtn.style.display = 'inline-flex';
-      gitCommitBtn.style.display = 'inline-flex';
-      aiBtn.style.display = 'inline-flex';
       activityBtn.style.display = 'inline-flex';
-      projectSelect.style.display = 'inline-block';
+      aiBtn.style.display = 'inline-flex';
 
-      // Populate projects
-      projectSelect.innerHTML = '';
-      if (currentAuth.projects && currentAuth.projects.length > 0) {
+      const hasProjects = currentAuth.projects && currentAuth.projects.length > 0;
+
+      // Only show project-dependent actions if user has at least one project
+      if (hasProjects) {
+        publishBtn.style.display = 'inline-flex';
+        gitCommitBtn.style.display = 'inline-flex';
+        projectSelect.style.display = 'inline-block';
+
+        // Populate projects dropdown
+        projectSelect.innerHTML = '';
         currentAuth.projects.forEach((p) => {
           const opt = document.createElement('option');
           opt.value = p.id;
@@ -764,10 +790,13 @@
           projectSelect.appendChild(opt);
         });
       } else {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = 'Axon Live Project';
-        projectSelect.appendChild(opt);
+        // No projects — hide project-specific controls
+        publishBtn.style.display = 'none';
+        gitCommitBtn.style.display = 'none';
+        projectSelect.style.display = 'inline-block';
+        projectSelect.innerHTML = '<option value="" disabled selected>No projects yet</option>';
+        // Ensure no stale active project
+        currentAuth.activeProjectId = null;
       }
     } else {
       dot.style.background = '#94A3B8';
