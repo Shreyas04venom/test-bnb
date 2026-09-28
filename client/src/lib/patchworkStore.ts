@@ -799,6 +799,9 @@ export const SEED_EXTENSION_SESSIONS: ExtensionSession[] = [
     workspaceId: 'ws-1',
     deviceName: "Shreyas's MacBook Chrome",
     browser: 'Chrome 129.0',
+    deviceInfo: 'MacBook Pro 16" (Chrome 129.0)',
+    version: '1.2.0',
+    ipAddress: '192.168.1.42',
     tokenHash: 'pw_tok_e942f7c0a8b9...',
     permissions: [
       'View projects',
@@ -915,6 +918,7 @@ interface PatchworkStoreState {
   logout: () => void;
   switchUser: (user: User) => void;
   setActiveProject: (projectId: string) => void;
+  updateWorkspace: (partial: Partial<Workspace>) => void;
   
   // Project actions
   createProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'workspaceId'>) => Project;
@@ -1005,6 +1009,10 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
 
       setActiveProject: (projectId: string) => {
         set({ activeProjectId: projectId });
+      },
+
+      updateWorkspace: (partial: Partial<Workspace>) => {
+        set((state) => ({ workspace: { ...state.workspace, ...partial } }));
       },
 
       createProject: (data) => {
@@ -1408,6 +1416,9 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
           workspaceId: get().workspace.id,
           deviceName,
           browser: 'Chrome (Extension v1.2)',
+          deviceInfo: deviceName,
+          version: '1.2.0',
+          ipAddress: '192.168.1.42',
           tokenHash: `pw_tok_${Math.random().toString(36).substring(2, 14)}`,
           permissions: [
             'View projects',

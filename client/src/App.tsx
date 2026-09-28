@@ -20,12 +20,20 @@ import CollaborationPage from "./pages/Collaboration";
 import VersionsPage from "./pages/Versions";
 import RollbackPage from "./pages/Rollback";
 import AuditLogsPage from "./pages/AuditLogs";
-import SettingsPage from "./pages/Settings";
+
+// Dedicated Settings & Integration Pages
+import WorkspaceSettingsPage from "./pages/settings/WorkspaceSettings";
+import TeamSettingsPage from "./pages/settings/TeamSettings";
+import ExtensionSettingsPage from "./pages/settings/ExtensionSettings";
+import AiSettingsPage from "./pages/settings/AiSettings";
+import SecuritySettingsPage from "./pages/settings/SecuritySettings";
 import IntegrationsHubPage from "./pages/integrations/IntegrationsHub";
 import GitHubIntegrationPage from "./pages/integrations/GitHubIntegration";
 import VercelIntegrationPage from "./pages/integrations/VercelIntegration";
 import NetlifyIntegrationPage from "./pages/integrations/NetlifyIntegration";
 import SupabaseIntegrationPage from "./pages/integrations/SupabaseIntegration";
+
+// Extension Auth
 import ExtensionConnectPage from "./pages/ExtensionConnect";
 import ExtensionSuccessPage from "./pages/ExtensionSuccess";
 import NotFound from "./pages/NotFound";
@@ -67,20 +75,22 @@ function Router() {
       <Route path="/audit" component={AuditLogsPage} />
       <Route path="/notifications" component={DashboardPage} />
 
-      {/* Settings & Distinct Integrations */}
-      <Route path="/settings" component={SettingsPage} />
-      <Route path="/settings/profile" component={SettingsPage} />
-      <Route path="/settings/workspace" component={SettingsPage} />
-      <Route path="/settings/team" component={SettingsPage} />
+      {/* Dedicated Workspace Settings Routes */}
+      <Route path="/settings" component={WorkspaceSettingsPage} />
+      <Route path="/settings/profile" component={WorkspaceSettingsPage} />
+      <Route path="/settings/workspace" component={WorkspaceSettingsPage} />
+      <Route path="/settings/team" component={TeamSettingsPage} />
+      <Route path="/settings/extension" component={ExtensionSettingsPage} />
+      <Route path="/settings/ai" component={AiSettingsPage} />
+      <Route path="/settings/security" component={SecuritySettingsPage} />
+      <Route path="/settings/billing" component={WorkspaceSettingsPage} />
+
+      {/* Distinct Dedicated Integration Sub-Routes */}
       <Route path="/settings/integrations" component={IntegrationsHubPage} />
       <Route path="/settings/integrations/github" component={GitHubIntegrationPage} />
       <Route path="/settings/integrations/vercel" component={VercelIntegrationPage} />
       <Route path="/settings/integrations/netlify" component={NetlifyIntegrationPage} />
       <Route path="/settings/integrations/supabase" component={SupabaseIntegrationPage} />
-      <Route path="/settings/security" component={SettingsPage} />
-      <Route path="/settings/extension" component={SettingsPage} />
-      <Route path="/settings/ai" component={SettingsPage} />
-      <Route path="/settings/billing" component={SettingsPage} />
 
       {/* Chrome Extension Pairing & Auth */}
       <Route path="/extension/connect" component={ExtensionConnectPage} />

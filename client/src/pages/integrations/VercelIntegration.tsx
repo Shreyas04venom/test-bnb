@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { Link } from 'wouter';
 import { DashboardLayout } from '@/components/DashboardLayout';
+import { SettingsNav } from '@/components/SettingsNav';
+import { VercelIcon } from '@/components/BrandIcons';
 import { usePatchworkStore } from '@/lib/patchworkStore';
 import {
-  Rocket,
   CheckCircle2,
   ExternalLink,
   RefreshCw,
-  FolderGit2,
+  Rocket,
   ShieldCheck,
   ArrowLeft,
-  Check
+  Check,
+  Globe
 } from 'lucide-react';
 
 export default function VercelIntegrationPage() {
@@ -18,9 +20,10 @@ export default function VercelIntegrationPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [connected, setConnected] = useState(integrations.vercel.connected);
 
-  const vercelProjects = [
-    { name: 'prj_shopwave_vercel', domain: 'shopwave.dev', framework: 'Next.js', status: 'Production Healthy' },
-    { name: 'prj_landinglab_vercel', domain: 'landinglab.co', framework: 'React (Vite)', status: 'Production Healthy' },
+  const projects = [
+    { name: 'shopwave-storefront', framework: 'Next.js 14', previewDomain: 'shopwave-pw-104.vercel.app', status: 'ready' },
+    { name: 'curacommerce-dashboard', framework: 'Next.js 14', previewDomain: 'cura-pw-99.vercel.app', status: 'ready' },
+    { name: 'landinglab-marketing', framework: 'React (Vite)', previewDomain: 'landinglab-dev.vercel.app', status: 'ready' },
   ];
 
   const handleSync = () => {
@@ -31,7 +34,7 @@ export default function VercelIntegrationPage() {
         ...prev,
         vercel: { ...prev.vercel, lastSync: 'Just now' },
       }));
-      logAudit('VERCEL_CONNECTED', { metadata: { action: 'resync_projects' } });
+      logAudit('INTEGRATION_SYNCED', { metadata: { provider: 'vercel' } });
     }, 600);
   };
 
@@ -47,30 +50,32 @@ export default function VercelIntegrationPage() {
   return (
     <DashboardLayout
       title="Vercel Integration"
-      subtitle="Preview deployments, edge aliases, and production promotion adapter."
+      subtitle="Ephemeral preview deployments and instant zero-downtime production promotions."
       actions={
         <Link
           href="/settings/integrations"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/10 bg-white text-xs font-semibold text-[#1B133C] hover:bg-slate-50"
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> All Integrations
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to Integrations Hub
         </Link>
       }
     >
       <div className="max-w-4xl space-y-6">
-        {/* Main Status */}
-        <div className="glass-card p-6 border border-white/80 space-y-4">
+        <SettingsNav currentTab="integrations" />
+
+        {/* Status Card */}
+        <div className="glass-card p-6 md:p-8 border border-white/80 space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-black/5">
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-black text-white flex items-center justify-center font-bold text-base shadow-xs">
-                ▲
+              <div className="w-12 h-12 rounded-2xl bg-black text-white flex items-center justify-center shadow-xs">
+                <VercelIcon size={22} />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-bold text-[#1B133C]">Vercel</h3>
+                  <h3 className="text-lg font-bold text-[#1B133C]">Vercel Team Platform</h3>
                   {connected ? (
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Connected
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Connected
                     </span>
                   ) : (
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-semibold">
@@ -79,7 +84,7 @@ export default function VercelIntegrationPage() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Connected Team: <strong className="text-[#1B133C]">{integrations.vercel.team}</strong>
+                  Connected Team: <strong className="text-[#1B133C] font-mono">{integrations.vercel.team}</strong>
                 </p>
               </div>
             </div>
@@ -106,27 +111,46 @@ export default function VercelIntegrationPage() {
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-white border border-black/5 text-xs text-muted-foreground leading-relaxed">
-            Every visual patch generated in PATCHWORK triggers an isolated Vercel preview deployment (e.g., <code className="text-indigo-600 font-mono">shopwave-git-patchwork-pw-104.vercel.app</code>) before team approval and production promotion.
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+            <div className="p-3.5 rounded-xl bg-white border border-black/5">
+              <p className="text-[11px] text-muted-foreground uppercase font-semibold">Preview Webhook</p>
+              <p className="text-xs font-bold text-emerald-700 mt-1">Configured (Auto-Trigger)</p>
+            </div>
+            <div className="p-3.5 rounded-xl bg-white border border-black/5">
+              <p className="text-[11px] text-muted-foreground uppercase font-semibold">Edge Regions</p>
+              <p className="text-xs font-bold text-[#1B133C] mt-1">Global Anycast (iad1, sfo1, cdg1)</p>
+            </div>
+            <div className="p-3.5 rounded-xl bg-white border border-black/5">
+              <p className="text-[11px] text-muted-foreground uppercase font-semibold">Build Cache</p>
+              <p className="text-xs font-bold text-indigo-700 mt-1">Active Turbopack Cache</p>
+            </div>
           </div>
         </div>
 
-        {/* Linked Projects Table */}
-        <div className="glass-card p-6 border border-white/80 space-y-4">
-          <h4 className="text-sm font-bold text-[#1B133C]">Mapped Vercel Projects</h4>
+        {/* Linked Projects */}
+        <div className="glass-card p-6 md:p-8 border border-white/80 space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-black/5">
+            <div>
+              <h4 className="text-sm font-bold text-[#1B133C]">Linked Vercel Projects</h4>
+              <p className="text-xs text-muted-foreground">Each visual patch generates an isolated Vercel branch deployment.</p>
+            </div>
+          </div>
 
           <div className="divide-y divide-black/5">
-            {vercelProjects.map((p) => (
-              <div key={p.name} className="py-3 flex items-center justify-between text-xs">
-                <div>
-                  <p className="font-bold text-[#1B133C] font-mono">{p.name}</p>
-                  <p className="text-muted-foreground mt-0.5">Production Domain: {p.domain}</p>
-                </div>
+            {projects.map((proj) => (
+              <div key={proj.name} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-3">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
-                    {p.status}
-                  </span>
+                  <Globe className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <div>
+                    <span className="font-bold text-[#1B133C]">{proj.name}</span>
+                    <span className="text-muted-foreground ml-2 font-mono text-[11px]">({proj.framework})</span>
+                    <p className="text-[11px] text-indigo-600 font-mono mt-0.5">{proj.previewDomain}</p>
+                  </div>
                 </div>
+
+                <span className="self-start sm:self-auto px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                  Previews Active ✓
+                </span>
               </div>
             ))}
           </div>

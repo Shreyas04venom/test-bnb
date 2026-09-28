@@ -237,6 +237,7 @@ export type AuditAction =
   | 'VERCEL_CONNECTED'
   | 'NETLIFY_CONNECTED'
   | 'SUPABASE_CONNECTED'
+  | 'INTEGRATION_SYNCED'
   | 'PROJECT_CREATED'
   | 'PROJECT_OWNERSHIP_VERIFIED'
   | 'PATCH_CREATED'
@@ -251,8 +252,11 @@ export type AuditAction =
   | 'VERIFICATION_FAILED'
   | 'ROLLBACK_TRIGGERED'
   | 'COLLABORATOR_INVITED'
+  | 'INVITATION_SENT'
   | 'EXTENSION_PAIRED'
+  | 'EXTENSION_REVOKED'
   | 'EXTENSION_SESSION_REVOKED'
+  | 'WORKSPACE_UPDATED'
   | 'AI_CONFIG_UPDATED';
 
 export interface AuditLog {
@@ -282,6 +286,9 @@ export interface ExtensionSession {
   lastActiveAt: string;
   expiresAt: string;
   revokedAt?: string;
+  deviceInfo?: string;
+  version?: string;
+  ipAddress?: string;
 }
 
 export interface IntegrationsConfig {

@@ -3,22 +3,19 @@ import { Link } from 'wouter';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { usePatchworkStore } from '@/lib/patchworkStore';
 import {
-  FolderGit2,
   GitPullRequest,
   Rocket,
   ShieldCheck,
-  RotateCcw,
-  Users,
-  CheckCircle2,
-  ExternalLink,
   ChevronRight,
-  Sparkles,
+  ExternalLink,
   Plus,
-  GitBranch,
-  GitCommit,
+  Puzzle,
+  Laptop,
+  CheckCircle2,
   Clock,
-  Layers
+  ArrowUpRight
 } from 'lucide-react';
+import { GitHubIcon, VercelIcon, ChromeIcon } from '@/components/BrandIcons';
 
 export default function DashboardPage() {
   const {
@@ -27,7 +24,7 @@ export default function DashboardPage() {
     deployments,
     verificationRun,
     auditLogs,
-    members,
+    extensionSessions,
     presence,
     activeProjectId,
   } = usePatchworkStore();
@@ -36,16 +33,17 @@ export default function DashboardPage() {
   const activePatches = patches.filter((p) => p.status !== 'DEPLOYED' && p.status !== 'ROLLED_BACK');
   const latestPatch = patches[0];
   const latestDeployment = deployments[0];
+  const isExtensionConnected = extensionSessions.length > 0;
 
   return (
     <DashboardLayout
       title="Overview"
       subtitle={`${activeProject.name} • ${activeProject.productionUrl.replace('https://', '')}`}
       actions={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <Link
             href="/patches"
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold shadow-xs hover:bg-black transition-all"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold shadow-xs hover:bg-black transition-all"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New Patch</span>
@@ -56,35 +54,37 @@ export default function DashboardPage() {
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-black/10 bg-white text-[#1B133C] text-xs font-semibold shadow-2xs hover:bg-slate-50 transition-all"
           >
-            <span>Visit Production</span>
-            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Visit Site</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
           </a>
         </div>
       }
     >
-      <div className="space-y-6">
-        {/* TOP SPOTLIGHT: ACTIVE PROJECT HERO & LIVE PREVIEW FRAME */}
-        <div className="glass-card p-6 border border-white/80 space-y-5">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-black/5">
+      <div className="space-y-8 max-w-6xl">
+        {/* TOP SPOTLIGHT: LIVE SITE PREVIEW & PATCH PIPELINE */}
+        <div className="glass-card p-6 md:p-8 border border-white/80 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-black/5">
             <div className="space-y-1">
               <div className="flex items-center gap-2.5">
                 <h2 className="text-xl font-bold text-[#1B133C]">{activeProject.name}</h2>
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Production Healthy
                 </span>
-                <span className="text-xs font-mono text-muted-foreground uppercase bg-black/5 px-2 py-0.5 rounded">
-                  {activeProject.framework} • {activeProject.deploymentProvider}
-                </span>
               </div>
-              <p className="text-xs text-muted-foreground font-mono">
-                {activeProject.repositoryName} (Branch: <span className="font-bold text-[#1B133C]">{activeProject.defaultBranch}</span>)
-              </p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
+                <GitHubIcon size={14} className="text-black/70" />
+                <span>{activeProject.repositoryName}</span>
+                <span>•</span>
+                <span>Branch: <strong>{activeProject.defaultBranch}</strong></span>
+                <span>•</span>
+                <span className="capitalize">{activeProject.framework}</span>
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
               <Link
                 href="/patches/PW-104"
-                className="px-4 py-2 rounded-xl bg-[#1B133C] text-white hover:bg-black text-xs font-semibold shadow-xs flex items-center gap-2"
+                className="px-4 py-2 rounded-xl bg-[#1B133C] text-white hover:bg-black text-xs font-semibold shadow-xs flex items-center gap-2 transition-all"
               >
                 <span>Inspect Active Patch (PW-104)</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -95,68 +95,76 @@ export default function DashboardPage() {
           {/* VISUAL SITE MOCKUP BANNER */}
           <div className="rounded-2xl border border-black/10 bg-white overflow-hidden shadow-xs">
             {/* Mock browser top bar */}
-            <div className="px-4 py-2.5 bg-slate-50 border-b border-black/5 flex items-center justify-between text-xs text-muted-foreground font-mono">
+            <div className="px-4 py-3 bg-slate-50/80 border-b border-black/5 flex items-center justify-between text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                <span className="ml-2 font-sans font-medium text-[#1B133C]">Live Preview: {activeProject.productionUrl}</span>
+                <span className="w-3 h-3 rounded-full bg-[#ff5f56]" />
+                <span className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
+                <span className="w-3 h-3 rounded-full bg-[#27c93f]" />
+                <span className="ml-3 font-mono text-[11px] text-[#1B133C] bg-white px-3 py-1 rounded-md border border-black/5 shadow-2xs">
+                  {activeProject.productionUrl}
+                </span>
               </div>
-              <span className="text-emerald-700 font-semibold">98.7% Visual Accuracy</span>
+              <div className="flex items-center gap-2 font-mono text-[11px] text-emerald-700 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span>12/12 Automated Checks Passed</span>
+              </div>
             </div>
 
-            {/* Visual preview content representation */}
-            <div className="p-8 sm:p-12 text-center bg-gradient-to-b from-white to-[#fbfaf8] space-y-4">
+            {/* Visual site preview illustration */}
+            <div className="p-8 sm:p-14 text-center bg-gradient-to-b from-white to-[#fbfaf8] space-y-4">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-black/10 bg-white shadow-2xs text-xs font-medium text-[#1B133C]">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Git-native visual patching v2.4</span>
+                <span>Live Preview Synchronized</span>
               </div>
               <h3 className="font-serif text-3xl sm:text-5xl font-normal text-[#1B133C] tracking-tight">
                 Hotfix the Internet.
               </h3>
               <p className="max-w-md mx-auto text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                Direct DOM manipulation and styling edits captured via Chrome extension and mapped to git commits.
+                Direct visual styling and DOM adjustments captured from Chrome and mapped to Git commits.
               </p>
               <div className="pt-2 flex justify-center gap-3">
-                <button className="px-6 py-2.5 rounded-xl bg-[#1B133C] text-white font-medium text-xs shadow-md">
-                  Start Patching Free
-                </button>
+                <Link
+                  href="/patches/PW-104"
+                  className="px-5 py-2.5 rounded-xl bg-[#1B133C] text-white font-medium text-xs shadow-md hover:bg-black transition-all"
+                >
+                  Review PW-104 Diff & Release
+                </Link>
               </div>
             </div>
           </div>
         </div>
 
         {/* 3 CLEAN KEY METRIC CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="glass-card p-5 border border-white/80 space-y-1.5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="glass-card p-6 border border-white/80 space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="font-semibold uppercase tracking-wider">Active Patches</span>
+              <span className="font-semibold uppercase tracking-wider">Active Visual Patches</span>
               <GitPullRequest className="w-4 h-4 text-indigo-600" />
             </div>
-            <p className="text-2xl font-bold text-[#1B133C]">{activePatches.length}</p>
-            <p className="text-xs text-indigo-700 font-medium">1 patch ready to deploy (PW-104)</p>
+            <p className="text-3xl font-bold text-[#1B133C]">{activePatches.length}</p>
+            <p className="text-xs text-indigo-700 font-medium">PW-104 approved & ready to deploy</p>
           </div>
 
-          <div className="glass-card p-5 border border-white/80 space-y-1.5">
+          <div className="glass-card p-6 border border-white/80 space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span className="font-semibold uppercase tracking-wider">Automated Verification</span>
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
             </div>
-            <p className="text-2xl font-bold text-[#1B133C]">12 / 12 Passed</p>
-            <p className="text-xs text-emerald-700 font-medium">Zero console errors • 98.7% match</p>
+            <p className="text-3xl font-bold text-[#1B133C]">12 / 12</p>
+            <p className="text-xs text-emerald-700 font-medium">Zero console errors • 98.7% visual match</p>
           </div>
 
-          <div className="glass-card p-5 border border-white/80 space-y-1.5">
+          <div className="glass-card p-6 border border-white/80 space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span className="font-semibold uppercase tracking-wider">Latest Production Release</span>
               <Rocket className="w-4 h-4 text-purple-600" />
             </div>
-            <p className="text-2xl font-bold text-[#1B133C]">DEP-89</p>
-            <p className="text-xs text-purple-700 font-medium">Live on Vercel (Commit: a8f9c12)</p>
+            <p className="text-3xl font-bold text-[#1B133C]">DEP-89</p>
+            <p className="text-xs text-purple-700 font-medium">Deployed on Vercel (Commit: a8f9c12)</p>
           </div>
         </div>
 
-        {/* TWO COLUMN GRID: ACTIVE PATCHES & ACTIVITY */}
+        {/* TWO COLUMN GRID: ACTIVE PATCHES & CLIENT PAIRING / ACTIVITY */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Active Patches (2 Columns) */}
           <div className="lg:col-span-2 space-y-4">
@@ -171,13 +179,13 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-3">
-              {patches.slice(0, 4).map((patch) => (
+              {patches.slice(0, 3).map((patch) => (
                 <div
                   key={patch.id}
-                  className="glass-card p-4 border border-white/80 hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  className="glass-card p-5 border border-white/80 hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                 >
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex items-center gap-2.5">
                       <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
                         {patch.id}
                       </span>
@@ -189,7 +197,7 @@ export default function DashboardPage() {
                       </Link>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>By <strong>{patch.author.name}</strong></span>
+                      <span>Author: <strong>{patch.author.name}</strong></span>
                       <span>•</span>
                       <span>{patch.files.length} files modified</span>
                       <span>•</span>
@@ -213,7 +221,7 @@ export default function DashboardPage() {
                     </span>
                     <Link
                       href={`/patches/${patch.id}`}
-                      className="px-3 py-1.5 rounded-xl bg-[#1B133C] text-white hover:bg-black text-xs font-semibold shadow-2xs"
+                      className="px-3.5 py-1.5 rounded-xl bg-[#1B133C] text-white hover:bg-black text-xs font-semibold shadow-2xs"
                     >
                       Review Diff
                     </Link>
@@ -223,56 +231,53 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Activity Feed & Team Presence (1 Column) */}
+          {/* Right Sidebar: Extension Status & Activity */}
           <div className="space-y-6">
-            {/* Live Presence */}
-            <div className="glass-card p-5 border border-white/80 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-black/5">
-                <span className="text-xs font-bold text-[#1B133C] flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Team Presence
+            {/* Chrome Extension Status */}
+            <div className="glass-card p-6 border border-white/80 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-black/5">
+                <div className="flex items-center gap-2.5">
+                  <ChromeIcon size={20} className="text-indigo-600" />
+                  <h4 className="text-xs font-bold text-[#1B133C] uppercase tracking-wider">Chrome Extension</h4>
+                </div>
+                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  {isExtensionConnected ? 'Connected ✓' : 'Pair Device'}
                 </span>
-                <Link href="/collaboration" className="text-[11px] text-indigo-600 hover:underline">
-                  Multiplayer
-                </Link>
               </div>
 
-              <div className="space-y-2.5">
-                {presence.map((p) => (
-                  <div key={p.userId} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2.5">
-                      <img src={p.avatar} alt={p.name} className="w-7 h-7 rounded-full object-cover" />
-                      <div>
-                        <p className="font-bold text-[#1B133C] leading-none">{p.name}</p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">{p.currentRoute}</p>
-                      </div>
-                    </div>
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.cursorColor }} />
-                  </div>
-                ))}
-              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                The PATCHWORK Chrome extension provides visual DOM inspection on your live website.
+              </p>
+
+              <Link
+                href="/settings/extension"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white border border-black/10 text-xs font-semibold text-[#1B133C] hover:bg-slate-50 transition-all shadow-2xs"
+              >
+                <span>Manage Paired Browsers</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
 
-            {/* Recent Activity */}
-            <div className="glass-card p-5 border border-white/80 space-y-3">
+            {/* Recent Audit Logs */}
+            <div className="glass-card p-6 border border-white/80 space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-black/5">
                 <h4 className="text-xs font-bold text-[#1B133C] uppercase tracking-wider">Recent Activity</h4>
                 <Link href="/audit" className="text-[11px] text-indigo-600 hover:underline">
-                  Audit Logs
+                  View Audit Logs
                 </Link>
               </div>
 
-              <div className="space-y-2.5 text-xs">
-                {auditLogs.slice(0, 5).map((log) => (
+              <div className="space-y-3 text-xs">
+                {auditLogs.slice(0, 4).map((log) => (
                   <div key={log.id} className="flex items-start gap-2.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 mt-1.5 shrink-0" />
-                    <div>
-                      <p className="text-[#1B133C] leading-tight">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 mt-1.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[#1B133C] leading-snug">
                         <strong>{log.user.name}</strong>{' '}
                         <span className="text-muted-foreground">{log.action.toLowerCase().replace(/_/g, ' ')}</span>{' '}
                         {log.patchId && <strong className="font-mono text-indigo-700">{log.patchId}</strong>}
                       </p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                      <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
                         {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>

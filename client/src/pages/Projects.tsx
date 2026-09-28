@@ -2,18 +2,17 @@ import React, { useState } from 'react';
 import { Link } from 'wouter';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { usePatchworkStore } from '@/lib/patchworkStore';
+import { GitHubIcon, VercelIcon, NetlifyIcon } from '@/components/BrandIcons';
 import {
   FolderGit2,
   ExternalLink,
-  Github,
-  Rocket,
   ShieldCheck,
   CheckCircle2,
   Plus,
-  Settings,
   GitPullRequest,
   AlertCircle,
-  Play
+  ArrowUpRight,
+  GitBranch
 } from 'lucide-react';
 import {
   Dialog,
@@ -59,29 +58,31 @@ export default function ProjectsPage() {
   return (
     <DashboardLayout
       title="Projects"
-      subtitle="Manage connected web repositories, deployment providers, and ownership verifications."
+      subtitle="Connected web repositories, deployment pipelines, and live domain environments."
       actions={
         <button
           onClick={() => setCreateModalOpen(true)}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold shadow-xs hover:bg-black transition-all"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold shadow-xs hover:bg-black transition-all"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Add Project</span>
         </button>
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-6xl">
         {/* Project Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map((project) => {
             const projectPatches = patches.filter((p) => p.projectId === project.id);
+            const isVercel = project.deploymentProvider.toLowerCase() === 'vercel';
+
             return (
               <div
                 key={project.id}
                 className="glass-card p-6 border border-white/80 flex flex-col justify-between hover:shadow-lg transition-all space-y-5"
               >
                 {/* Header */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="text-base font-bold text-[#1B133C]">{project.name}</h3>
@@ -89,87 +90,73 @@ export default function ProjectsPage() {
                         href={project.repositoryUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#1B133C] mt-0.5"
+                        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#1B133C] mt-1"
                       >
-                        <Github className="w-3.5 h-3.5" />
+                        <GitHubIcon size={14} className="text-black/80" />
                         <span className="font-mono">{project.repositoryName}</span>
                       </a>
                     </div>
                     <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 ${
+                      className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1 ${
                         project.ownershipStatus === 'verified'
                           ? 'bg-emerald-100 text-emerald-800'
                           : 'bg-amber-100 text-amber-800'
                       }`}
                     >
-                      {project.ownershipStatus === 'verified' ? (
-                        <>
-                          <CheckCircle2 className="w-3 h-3" /> Ownership Verified
-                        </>
-                      ) : (
-                        <>
-                          <AlertCircle className="w-3 h-3" /> Unverified
-                        </>
-                      )}
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Verified
                     </span>
                   </div>
 
                   {/* Metadata Tags */}
-                  <div className="grid grid-cols-2 gap-2 text-xs pt-2">
-                    <div className="p-2 rounded-lg bg-black/5">
-                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">Framework</p>
-                      <p className="font-medium text-[#1B133C]">{project.framework}</p>
-                    </div>
-                    <div className="p-2 rounded-lg bg-black/5">
-                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">Provider</p>
-                      <p className="font-medium text-[#1B133C] uppercase">{project.deploymentProvider}</p>
-                    </div>
+                  <div className="flex items-center gap-2 pt-1 text-xs">
+                    <span className="px-2.5 py-1 rounded-lg bg-black/5 font-medium text-[#1B133C]">
+                      {project.framework}
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-black/5 font-medium text-[#1B133C] inline-flex items-center gap-1.5 capitalize">
+                      {isVercel ? <VercelIcon size={11} /> : <NetlifyIcon size={11} />}
+                      <span>{project.deploymentProvider}</span>
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-black/5 font-mono text-muted-foreground inline-flex items-center gap-1 text-[11px]">
+                      <GitBranch className="w-3 h-3" />
+                      <span>{project.defaultBranch}</span>
+                    </span>
                   </div>
 
-                  {/* URL */}
-                  <div className="pt-1 flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Production URL:</span>
+                  {/* Production URL */}
+                  <div className="pt-2 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Production:</span>
                     <a
                       href={project.productionUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="font-medium text-indigo-600 hover:underline inline-flex items-center gap-1 truncate max-w-[180px]"
+                      className="font-medium text-indigo-600 hover:underline inline-flex items-center gap-1 truncate max-w-[190px]"
                     >
                       <span>{project.productionUrl.replace('https://', '')}</span>
-                      <ExternalLink className="w-3 h-3" />
+                      <ArrowUpRight className="w-3.5 h-3.5" />
                     </a>
                   </div>
 
-                  {/* Branch & Status */}
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Default Branch: <strong className="font-mono text-[#1B133C]">{project.defaultBranch}</strong></span>
-                    <span>{projectPatches.length} patches</span>
+                  {/* Patch count */}
+                  <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+                    <span>Active Patches:</span>
+                    <span className="font-bold text-[#1B133C]">{projectPatches.length} patches</span>
                   </div>
                 </div>
 
                 {/* Card Action Buttons */}
-                <div className="pt-4 border-t border-black/5 grid grid-cols-3 gap-2 text-xs">
+                <div className="pt-4 border-t border-black/5 flex items-center justify-between gap-2">
                   <Link
                     href={`/projects/${project.id}`}
-                    className="py-1.5 px-2 rounded-lg border border-black/10 bg-white hover:bg-black/5 font-semibold text-center text-[#1B133C] transition-colors"
+                    className="flex-1 py-2 px-3 rounded-xl border border-black/10 bg-white hover:bg-black/5 font-semibold text-center text-xs text-[#1B133C] transition-all shadow-2xs"
                   >
-                    Open
+                    Open Project
                   </Link>
                   <Link
                     href={`/patches?projectId=${project.id}`}
-                    className="py-1.5 px-2 rounded-lg border border-black/10 bg-white hover:bg-black/5 font-semibold text-center text-[#1B133C] transition-colors"
+                    className="py-2 px-3 rounded-xl bg-[#1B133C] text-white hover:bg-black font-semibold text-center text-xs transition-all shadow-2xs"
                   >
-                    Patches
+                    View Patches
                   </Link>
-                  <a
-                    href={project.productionUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="py-1.5 px-2 rounded-lg bg-[#1B133C] text-white hover:bg-black font-semibold text-center transition-colors inline-flex items-center justify-center gap-1"
-                  >
-                    <span>Visit</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
                 </div>
               </div>
             );
@@ -181,91 +168,87 @@ export default function ProjectsPage() {
       <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
         <DialogContent className="sm:max-w-md glass-card border border-white/80">
           <DialogHeader>
-            <DialogTitle className="font-serif text-2xl text-[#1B133C]">Connect New Project</DialogTitle>
+            <DialogTitle className="text-base font-bold text-[#1B133C]">Add New Project</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Map a GitHub repository and deployment environment into PATCHWORK.
+              Link a GitHub repository to enable visual DOM patching and preview environments.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreate} className="space-y-4 py-2">
-            <div>
-              <label className="block text-xs font-semibold text-[#1B133C] mb-1">Project Name</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[#1B133C]">Project Display Name</label>
               <input
                 type="text"
-                required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. AcmeStorefront"
-                className="w-full px-3 py-2 rounded-xl border border-black/10 bg-white text-xs"
+                placeholder="e.g. Marketing Storefront"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 bg-white text-xs focus:outline-none"
+                required
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-[#1B133C] mb-1">GitHub Repository</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[#1B133C]">GitHub Repository (org/repo)</label>
               <input
                 type="text"
-                required
                 value={repoName}
                 onChange={(e) => setRepoName(e.target.value)}
-                placeholder="org/repo-name"
-                className="w-full px-3 py-2 rounded-xl border border-black/10 bg-white text-xs font-mono"
+                placeholder="company/project-repo"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 bg-white text-xs font-mono focus:outline-none"
+                required
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-[#1B133C] mb-1">Framework</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[#1B133C]">Framework</label>
                 <select
                   value={framework}
                   onChange={(e) => setFramework(e.target.value as any)}
-                  className="w-full px-3 py-2 rounded-xl border border-black/10 bg-white text-xs"
+                  className="w-full px-3 py-2 rounded-xl border border-black/10 bg-white text-xs focus:outline-none"
                 >
                   <option value="Next.js">Next.js</option>
                   <option value="React (Vite)">React (Vite)</option>
-                  <option value="Vue / Nuxt">Vue / Nuxt</option>
-                  <option value="SvelteKit">SvelteKit</option>
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-[#1B133C] mb-1">Provider</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[#1B133C]">Cloud Provider</label>
                 <select
                   value={provider}
                   onChange={(e) => setProvider(e.target.value as any)}
-                  className="w-full px-3 py-2 rounded-xl border border-black/10 bg-white text-xs"
+                  className="w-full px-3 py-2 rounded-xl border border-black/10 bg-white text-xs focus:outline-none"
                 >
                   <option value="vercel">Vercel</option>
                   <option value="netlify">Netlify</option>
-                  <option value="custom">Custom Adapter</option>
                 </select>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-[#1B133C] mb-1">Production URL</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[#1B133C]">Production Website URL</label>
               <input
                 type="url"
-                required
                 value={productionUrl}
                 onChange={(e) => setProductionUrl(e.target.value)}
-                placeholder="https://mysite.com"
-                className="w-full px-3 py-2 rounded-xl border border-black/10 bg-white text-xs"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-black/10 bg-white text-xs font-mono focus:outline-none"
+                required
               />
             </div>
 
-            <DialogFooter className="pt-4">
+            <DialogFooter className="pt-2">
               <button
                 type="button"
                 onClick={() => setCreateModalOpen(false)}
-                className="px-4 py-2 rounded-xl border border-black/10 bg-white text-xs font-semibold text-[#1B133C]"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#1B133C] hover:bg-black/5"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold hover:bg-black"
+                className="px-4 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold hover:bg-black shadow-xs"
               >
-                Import & Authorize
+                Connect Project
               </button>
             </DialogFooter>
           </form>

@@ -1,19 +1,18 @@
 import React, { useState } from 'react';
 import { Link } from 'wouter';
 import { DashboardLayout } from '@/components/DashboardLayout';
+import { SettingsNav } from '@/components/SettingsNav';
+import { GitHubIcon } from '@/components/BrandIcons';
 import { usePatchworkStore } from '@/lib/patchworkStore';
 import {
-  Github,
   CheckCircle2,
   ExternalLink,
   RefreshCw,
   GitBranch,
   ShieldCheck,
   FolderGit2,
-  Lock,
   ArrowLeft,
-  Check,
-  AlertTriangle
+  Check
 } from 'lucide-react';
 
 export default function GitHubIntegrationPage() {
@@ -52,31 +51,33 @@ export default function GitHubIntegrationPage() {
 
   return (
     <DashboardLayout
-      title="GitHub Integration"
+      title="GitHub App Integration"
       subtitle="Git-native connection via the official PATCHWORK GitHub App."
       actions={
         <Link
           href="/settings/integrations"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-black/10 bg-white text-xs font-semibold text-[#1B133C] hover:bg-slate-50"
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> All Integrations
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to Integrations Hub
         </Link>
       }
     >
       <div className="max-w-4xl space-y-6">
+        <SettingsNav currentTab="integrations" />
+
         {/* Connection Status Card */}
-        <div className="glass-card p-6 border border-white/80 space-y-4">
+        <div className="glass-card p-6 md:p-8 border border-white/80 space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-black/5">
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-black text-white flex items-center justify-center shadow-xs">
-                <Github className="w-6 h-6" />
+                <GitHubIcon size={24} />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-bold text-[#1B133C]">GitHub App</h3>
+                  <h3 className="text-lg font-bold text-[#1B133C]">GitHub Organization App</h3>
                   {connected ? (
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Connected
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Connected
                     </span>
                   ) : (
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-semibold">
@@ -85,7 +86,7 @@ export default function GitHubIntegrationPage() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Installed on Organization: <strong className="text-[#1B133C] font-mono">{integrations.github.org}</strong>
+                  Authorized Organization: <strong className="text-[#1B133C] font-mono">{integrations.github.org}</strong>
                 </p>
               </div>
             </div>
@@ -118,32 +119,32 @@ export default function GitHubIntegrationPage() {
               Git-Native Lifecycle Workflow
             </span>
             <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-[#1B133C]">
-              <span className="px-2 py-1 bg-slate-100 rounded">1. Patch Created</span>
+              <span className="px-2.5 py-1 bg-slate-100 rounded">1. Visual Edit Captured</span>
               <span>→</span>
-              <span className="px-2 py-1 bg-indigo-50 text-indigo-700 font-bold rounded">2. Branch patchwork/PW-104</span>
+              <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-bold rounded">2. Branch Created (patchwork/*)</span>
               <span>→</span>
-              <span className="px-2 py-1 bg-slate-100 rounded">3. Isolated Preview</span>
+              <span className="px-2.5 py-1 bg-slate-100 rounded">3. Isolated Preview Deployed</span>
               <span>→</span>
-              <span className="px-2 py-1 bg-emerald-50 text-emerald-800 rounded">4. Pull Request Sync</span>
+              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded">4. PR Synchronized</span>
               <span>→</span>
-              <span className="px-2 py-1 bg-[#1B133C] text-white rounded">5. Production Merge</span>
+              <span className="px-2.5 py-1 bg-[#1B133C] text-white rounded">5. Production Release</span>
             </div>
           </div>
         </div>
 
         {/* Repositories Access Table */}
-        <div className="glass-card p-6 border border-white/80 space-y-4">
+        <div className="glass-card p-6 md:p-8 border border-white/80 space-y-4">
           <div className="flex items-center justify-between pb-2 border-b border-black/5">
             <div>
-              <h4 className="text-sm font-bold text-[#1B133C]">Accessible Repositories</h4>
-              <p className="text-xs text-muted-foreground">Repositories configured for PATCHWORK visual hotfixing.</p>
+              <h4 className="text-sm font-bold text-[#1B133C]">Installed Repositories</h4>
+              <p className="text-xs text-muted-foreground">Authorized for branch creation and visual patch pull requests.</p>
             </div>
             <span className="text-xs font-mono text-muted-foreground">Last sync: {integrations.github.lastSync}</span>
           </div>
 
           <div className="divide-y divide-black/5">
             {repos.map((repo) => (
-              <div key={repo.name} className="py-3 flex items-center justify-between text-xs">
+              <div key={repo.name} className="py-3.5 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-3">
                   <FolderGit2 className="w-4 h-4 text-indigo-600" />
                   <div>
@@ -155,7 +156,7 @@ export default function GitHubIntegrationPage() {
                 <div className="flex items-center gap-3">
                   <span className="text-muted-foreground font-mono">{repo.patchesCount} patches</span>
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
                       repo.active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
                     }`}
                   >
@@ -170,10 +171,10 @@ export default function GitHubIntegrationPage() {
         {/* Security & Permissions */}
         <div className="glass-card p-6 border border-white/80 space-y-3">
           <h4 className="text-sm font-bold text-[#1B133C] flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" /> Security & Least Privilege
+            <ShieldCheck className="w-4 h-4 text-emerald-600" /> Security & Short-Lived Tokens
           </h4>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            PATCHWORK strictly uses short-lived GitHub App tokens. Personal Access Tokens (PATs) are never accepted or stored. All code changes result in traceable git commits authored by verified workspace members.
+            PATCHWORK strictly uses short-lived GitHub App installation tokens. Personal Access Tokens (PATs) are never required or stored. All code changes result in traceable git commits signed by verified workspace members.
           </p>
         </div>
       </div>

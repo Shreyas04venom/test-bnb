@@ -8,11 +8,10 @@ import {
   ShieldCheck,
   Users,
   History,
-  RotateCcw,
   FileText,
   Settings,
+  Boxes,
   Puzzle,
-  Github,
   Search,
   ChevronDown,
   LogOut,
@@ -21,9 +20,7 @@ import {
   AlertTriangle,
   Menu,
   X,
-  Sparkles,
-  CheckCircle2,
-  Database
+  CheckCircle2
 } from 'lucide-react';
 import { PatchworkLogo } from './PatchworkLogo';
 import { CommandPalette } from './CommandPalette';
@@ -62,31 +59,20 @@ export function DashboardLayout({ children, title, subtitle, actions }: Dashboar
   const activeProject = projects.find((p) => p.id === activeProjectId) || projects[0];
   const isExtensionConnected = extensionSessions.length > 0;
 
-  const mainNav = [
+  const platformNav = [
     { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
     { label: 'Projects', href: '/projects', icon: FolderGit2, badge: projects.length },
-    { label: 'Patches', href: '/patches', icon: GitPullRequest, badge: 'Live' },
+    { label: 'Visual Patches', href: '/patches', icon: GitPullRequest, badge: 'Live' },
     { label: 'Deployments', href: '/deployments', icon: Rocket },
     { label: 'Verification', href: '/verification', icon: ShieldCheck },
-    { label: 'Collaboration', href: '/collaboration', icon: Users, badge: 'Realtime' },
-    { label: 'Conflicts', href: '/conflicts', icon: AlertTriangle, badge: '1' },
-    { label: 'Versions', href: '/versions', icon: History },
-    { label: 'Rollback', href: '/rollback', icon: RotateCcw },
+    { label: 'Multiplayer', href: '/collaboration', icon: Users, badge: 'Realtime' },
+    { label: 'Versions & Rollback', href: '/versions', icon: History },
     { label: 'Audit Logs', href: '/audit', icon: FileText },
   ];
 
-  const integrationNav = [
-    { label: 'GitHub App', href: '/settings/integrations/github', icon: Github, connected: true },
-    { label: 'Vercel Previews', href: '/settings/integrations/vercel', icon: Rocket, connected: true },
-    { label: 'Netlify Sites', href: '/settings/integrations/netlify', icon: ExternalLink, connected: true },
-    { label: 'Supabase Realtime', href: '/settings/integrations/supabase', icon: Database, connected: true },
-  ];
-
-  const settingsNav = [
-    { label: 'Workspace Settings', href: '/settings/workspace', icon: Settings },
-    { label: 'Team & Members', href: '/settings/team', icon: Users },
-    { label: 'Chrome Extension', href: '/settings/extension', icon: Puzzle },
-    { label: 'AI Model & Gates', href: '/settings/ai', icon: Sparkles },
+  const secondaryNav = [
+    { label: 'Integrations', href: '/settings/integrations', icon: Boxes, badge: '4 Active' },
+    { label: 'Settings', href: '/settings/workspace', icon: Settings },
   ];
 
   return (
@@ -137,18 +123,19 @@ export function DashboardLayout({ children, title, subtitle, actions }: Dashboar
         </div>
 
         {/* Main Navigation Links */}
-        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-6">
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+          {/* Platform Group */}
           <div>
             <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#1B133C]/50">Platform</p>
             <nav className="space-y-0.5">
-              {mainNav.map((item) => {
+              {platformNav.map((item) => {
                 const Icon = item.icon;
                 const isActive = location === item.href || (item.href !== '/dashboard' && location.startsWith(item.href));
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                       isActive
                         ? 'bg-[#1B133C] text-white shadow-xs font-semibold'
                         : 'text-[#1B133C]/80 hover:bg-black/5 hover:text-[#1B133C]'
@@ -175,63 +162,41 @@ export function DashboardLayout({ children, title, subtitle, actions }: Dashboar
             </nav>
           </div>
 
-          {/* Integrations */}
+          {/* Configuration Group */}
           <div>
-            <div className="flex items-center justify-between px-2 pb-1.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#1B133C]/50">Integrations</p>
-              <Link href="/settings/integrations" className="text-[10px] text-indigo-600 hover:underline">
-                Manage
-              </Link>
-            </div>
+            <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#1B133C]/50">Configuration</p>
             <nav className="space-y-0.5">
-              {integrationNav.map((item) => {
+              {secondaryNav.map((item) => {
                 const Icon = item.icon;
-                const isActive = location === item.href;
+                const isActive =
+                  location === item.href ||
+                  (item.href === '/settings/integrations' && location.startsWith('/settings/integrations')) ||
+                  (item.href === '/settings/workspace' && location.startsWith('/settings') && !location.startsWith('/settings/integrations'));
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                       isActive
-                        ? 'bg-[#1B133C] text-white font-semibold'
+                        ? 'bg-[#1B133C] text-white shadow-xs font-semibold'
                         : 'text-[#1B133C]/80 hover:bg-black/5 hover:text-[#1B133C]'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <Icon className="w-4 h-4 text-[#1B133C]/60" />
+                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-[#1B133C]/60'}`} />
                       <span>{item.label}</span>
                     </div>
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* Settings Submenu */}
-          <div>
-            <div className="flex items-center justify-between px-2 pb-1.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#1B133C]/50">Workspace & Settings</p>
-              <Link href="/settings" className="text-[10px] text-indigo-600 hover:underline">
-                Overview
-              </Link>
-            </div>
-            <nav className="space-y-0.5">
-              {settingsNav.map((item) => {
-                const Icon = item.icon;
-                const isActive = location === item.href;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      isActive
-                        ? 'bg-[#1B133C] text-white font-semibold'
-                        : 'text-[#1B133C]/80 hover:bg-black/5 hover:text-[#1B133C]'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 text-[#1B133C]/60" />
-                    <span>{item.label}</span>
+                    {item.badge && (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                          isActive
+                            ? 'bg-white/20 text-white'
+                            : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -243,7 +208,7 @@ export function DashboardLayout({ children, title, subtitle, actions }: Dashboar
         <div className="p-3 border-t border-[#1B133C]/10 bg-black/[0.01]">
           <Link
             href="/settings/extension"
-            className="block p-2.5 rounded-xl border border-dashed border-[#1B133C]/20 hover:border-indigo-500 bg-white/70 transition-all group"
+            className="block p-3 rounded-xl border border-dashed border-[#1B133C]/20 hover:border-indigo-500 bg-white/70 transition-all group"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -255,11 +220,11 @@ export function DashboardLayout({ children, title, subtitle, actions }: Dashboar
                   isExtensionConnected ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                 }`}
               >
-                {isExtensionConnected ? 'Connected ✓' : 'Pair Device'}
+                {isExtensionConnected ? 'Paired ✓' : 'Pair Device'}
               </span>
             </div>
             <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
-              {isExtensionConnected ? "Visual editing client active" : "Connect client for visual editing"}
+              {isExtensionConnected ? "Visual editing client active" : "Pair client for visual website editing"}
             </p>
           </Link>
         </div>
@@ -299,8 +264,8 @@ export function DashboardLayout({ children, title, subtitle, actions }: Dashboar
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setLocation('/settings/profile')} className="text-xs">
-                Profile Settings
+              <DropdownMenuItem onClick={() => setLocation('/settings/workspace')} className="text-xs">
+                Workspace Settings
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => logout()} className="text-xs text-rose-600 font-medium">
                 <LogOut className="w-3.5 h-3.5 mr-2" /> Log out
@@ -396,6 +361,38 @@ export function DashboardLayout({ children, title, subtitle, actions }: Dashboar
             <NotificationCenter />
           </div>
         </header>
+
+        {/* Mobile Navigation Drawer */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden p-4 bg-white/95 border-b border-black/10 space-y-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Platform</p>
+            <div className="grid grid-cols-2 gap-2">
+              {platformNav.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 rounded-xl border border-black/5 text-xs font-medium text-[#1B133C] hover:bg-black/5"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground pt-2">Configuration</p>
+            <div className="grid grid-cols-2 gap-2">
+              {secondaryNav.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 rounded-xl border border-black/5 text-xs font-medium text-[#1B133C] hover:bg-black/5"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Page Header (if title specified) */}
         {title && (
