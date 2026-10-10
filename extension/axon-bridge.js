@@ -13,7 +13,20 @@
   'use strict';
 
   const PRODUCTION_SERVER_URL = 'https://bnb-gamma-red.vercel.app';
-  const DEFAULT_SERVER_URL = PRODUCTION_SERVER_URL;
+  
+  function detectDefaultServerUrl() {
+    try {
+      if (typeof window !== 'undefined' && window.location) {
+        const origin = window.location.origin;
+        if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('ngrok'))) {
+          return origin;
+        }
+      }
+    } catch {}
+    return 'http://localhost:3000';
+  }
+
+  const DEFAULT_SERVER_URL = detectDefaultServerUrl();
   const STORAGE_KEY = 'axon_auth_session';
 
   let currentAuth = {
@@ -44,9 +57,9 @@
         if (raw) currentAuth = { ...currentAuth, ...JSON.parse(raw) };
       }
 
-      // Upgrade previous localhost server URL to the deployed Axon web production URL
-      if (!currentAuth.serverUrl || currentAuth.serverUrl.includes('localhost')) {
-        currentAuth.serverUrl = DEFAULT_SERVER_URL;
+      // If no server URL is stored, use detected URL
+      if (!currentAuth.serverUrl) {
+        currentAuth.serverUrl = detectDefaultServerUrl();
       }
     } catch (e) {
       console.warn('[AxonBridge] Storage load warning:', e);
@@ -184,24 +197,53 @@
   }
 
   // ==========================================
-  // Pairing Option 2: 6-Digit PIN Code
+  // Pairing Option 2: 6-Digit PIN Code / Access Token
   // ==========================================
   async function pairWithCode(pairingCode, customServerUrl) {
-    const serverUrl = customServerUrl || currentAuth.serverUrl || DEFAULT_SERVER_URL;
+    let serverUrl = (customServerUrl || currentAuth.serverUrl || detectDefaultServerUrl()).trim();
+    // Strip trailing slashes
+    serverUrl = serverUrl.replace(/\/+$/, '');
+    const cleanCode = pairingCode.trim();
+
     try {
+      // Check if user entered an existing raw session token directly
+      if (cleanCode.startsWith('axon_ext_tok_') || cleanCode.startsWith('Bearer ') || cleanCode.startsWith('ext-sess-')) {
+        const rawToken = cleanCode.replace(/^Bearer\s+/i, '');
+        currentAuth.token = rawToken;
+        currentAuth.serverUrl = serverUrl;
+        await fetchProjects();
+        await saveAuth();
+        startPresenceSync();
+        updateUI();
+        return {
+          ok: true,
+          workspace: currentAuth.workspace || { name: 'Axon Workspace' },
+          user: currentAuth.user || { name: 'Authorized User' },
+        };
+      }
+
       const res = await fetch(`${serverUrl}/api/extension/session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          pairingCode: pairingCode.trim(),
+          pairingCode: cleanCode,
           deviceName: navigator.userAgent.includes('Mac') ? 'Chrome on Mac' : 'Chrome on Windows',
           browser: 'Chrome Visual Inspector',
         }),
       });
 
-      const json = await res.json();
+      const responseText = await res.text();
+      let json = null;
+      try {
+        json = JSON.parse(responseText);
+      } catch {
+        throw new Error(
+          `Server at ${serverUrl} returned HTTP ${res.status} (${res.statusText || 'Non-JSON'}). Please verify the server URL is running and accessible.`
+        );
+      }
+
       if (!res.ok || !json.success) {
-        throw new Error(json?.error?.message || json?.error || 'Invalid or expired pairing code.');
+        throw new Error(json?.error?.message || json?.error || json?.message || 'Invalid or expired pairing code.');
       }
 
       const userProjects = json.projects || [];
@@ -894,13 +936,19 @@
 
               <!-- OPTION 2: Manual Code Typing -->
               <div style="margin-bottom: 10px;">
-                <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600; margin-bottom: 4px;">AXON Server URL</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <label style="font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600;">AXON Server URL</label>
+                  <div style="display: flex; gap: 4px;">
+                    <button type="button" id="axon-url-local" style="font-size: 9px; padding: 1px 6px; border-radius: 4px; background: rgba(99,102,241,0.2); border: 1px solid #6366F1; color: #A5B4FC; cursor: pointer;">localhost:3000</button>
+                    <button type="button" id="axon-url-prod" style="font-size: 9px; padding: 1px 6px; border-radius: 4px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #CBD5E1; cursor: pointer;">Production</button>
+                  </div>
+                </div>
                 <input id="axon-modal-url" type="text" value="${currentAuth.serverUrl || DEFAULT_SERVER_URL}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; padding: 6px 8px; font-size: 11px; outline: none;" />
               </div>
 
               <div style="margin-bottom: 12px;">
                 <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600; margin-bottom: 4px;">Pairing PIN or Access Token</label>
-                <input id="axon-modal-pin" type="text" maxlength="128" placeholder="e.g. 849201 or token" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid #6366F1; border-radius: 6px; color: #10B981; padding: 8px; font-size: 14px; font-family: monospace; font-weight: bold; letter-spacing: 2px; text-align: center; outline: none;" />
+                <input id="axon-modal-pin" type="text" maxlength="128" placeholder="e.g. 849201 or axon_ext_tok_..." style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid #6366F1; border-radius: 6px; color: #10B981; padding: 8px; font-size: 14px; font-family: monospace; font-weight: bold; letter-spacing: 2px; text-align: center; outline: none;" />
               </div>
 
               <div id="axon-modal-error" style="display: none; color: #F87171; font-size: 11px; margin-bottom: 10px;"></div>
@@ -936,9 +984,16 @@
       const webAuthBtn = document.getElementById('axon-modal-web-auth-btn');
       const webAuthStatus = document.getElementById('axon-web-auth-status');
       const errorDiv = document.getElementById('axon-modal-error');
+      const localBtn = document.getElementById('axon-url-local');
+      const prodBtn = document.getElementById('axon-url-prod');
+
+      if (localBtn) localBtn.onclick = () => { urlInput.value = 'http://localhost:3000'; };
+      if (prodBtn) prodBtn.onclick = () => { urlInput.value = PRODUCTION_SERVER_URL; };
 
       webAuthBtn.onclick = () => {
         const sUrl = urlInput.value.trim() || DEFAULT_SERVER_URL;
+        currentAuth.serverUrl = sUrl;
+        saveAuth();
         webAuthStatus.style.display = 'block';
         startWebAuth(sUrl);
       };

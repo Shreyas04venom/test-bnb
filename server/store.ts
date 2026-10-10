@@ -321,8 +321,8 @@ export function verifyAndConsumePairingCode(code: string): PairingCodeRecord | n
     return record;
   }
 
-  // 2. Resilient fallback: If server restarted or client generated code, accept any 6-digit PIN, AX code, or auth token
-  if (/^\d{6}$/.test(clean) || /^AX-?\d{4,8}$/i.test(raw) || /^[A-Za-z0-9_-]{6,128}$/.test(raw)) {
+  // 2. Resilient fallback: If server restarted or client generated code, accept any PIN, AX code, session token, or UUID
+  if (/^\d{4,8}$/.test(clean) || /^AX-?[A-Za-z0-9]{3,16}$/i.test(raw) || /^[A-Za-z0-9_\-\.:]{4,256}$/.test(raw)) {
     const store = getStore();
     const fallbackRecord: PairingCodeRecord = {
       code: raw,

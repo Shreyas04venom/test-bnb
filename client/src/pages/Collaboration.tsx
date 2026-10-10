@@ -99,28 +99,43 @@ export default function CollaborationPage() {
 
   // Generate or regenerate shareable invite link
   const handleGenerateLink = async () => {
-    if (!activeProject) return;
+    const targetProjId = activeProject?.id || (projects.length > 0 ? projects[0].id : 'axon-workspace');
     setIsGeneratingLink(true);
     try {
-      const res = await createProjectInvite(activeProject.id, inviteRole);
+      const res = await createProjectInvite(targetProjId, inviteRole);
       if (res && res.code) {
         const fullUrl = `${window.location.origin}/invite/${res.code}`;
         setGeneratedInviteUrl(fullUrl);
       }
+    } catch (err) {
+      console.error('Error creating invite link:', err);
     } finally {
       setIsGeneratingLink(false);
     }
   };
 
   useEffect(() => {
-    if (isInviteOpen && activeProject && !generatedInviteUrl) {
+    if (isInviteOpen && !generatedInviteUrl) {
       handleGenerateLink();
     }
   }, [isInviteOpen, activeProject]);
 
   const handleCopyLink = () => {
     if (!generatedInviteUrl) return;
-    navigator.clipboard.writeText(generatedInviteUrl);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(generatedInviteUrl);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = generatedInviteUrl;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+    } catch (err) {
+      console.warn('Clipboard write fallback error:', err);
+    }
     setIsCopied(true);
     toast.success('Shareable Invite Link Copied!', {
       description: 'Send this link to your friends. They can open it directly to accept or decline.',
@@ -449,7 +464,7 @@ export default function CollaborationPage() {
                   <input
                     type="text"
                     readOnly
-                    value={generatedInviteUrl || 'Generating link...'}
+                    value={generatedInviteUrl || (isGeneratingLink ? 'Generating link...' : 'Click "Generate New Link"')}
                     className="flex-1 px-3 py-2 rounded-lg bg-white border border-black/10 text-xs font-mono text-[#1B133C] select-all focus:outline-none"
                   />
                   <button

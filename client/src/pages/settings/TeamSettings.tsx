@@ -23,22 +23,27 @@ import { useUser } from '@clerk/clerk-react';
 
 export default function TeamSettingsPage() {
   const { user: clerkUser } = useUser();
-  const { members, currentUser, switchUser, logAudit } = usePatchworkStore();
+  const { members, currentUser, switchUser, logAudit, projects, createProjectInvite } = usePatchworkStore();
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'developer' | 'viewer'>('developer');
   const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState('');
 
-  const handleSendInvite = (e: React.FormEvent) => {
+  const handleSendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail) return;
+    const targetProjId = projects?.[0]?.id || 'axon-workspace';
+    const res = await createProjectInvite(targetProjId, inviteRole, inviteEmail);
+    if (res && res.code) {
+      const fullUrl = `${window.location.origin}/invite/${res.code}`;
+      setGeneratedLink(fullUrl);
+      try {
+        navigator.clipboard.writeText(fullUrl);
+      } catch {}
+    }
     setInviteSuccess(true);
     logAudit('INVITATION_SENT', { metadata: { email: inviteEmail, role: inviteRole } });
-    setTimeout(() => {
-      setInviteSuccess(false);
-      setInviteModalOpen(false);
-      setInviteEmail('');
-    }, 1200);
   };
 
   return (
@@ -180,26 +185,56 @@ export default function TeamSettingsPage() {
               </div>
 
               {inviteSuccess && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Invitation sent successfully!</span>
+                <div className="space-y-2 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900">
+                  <div className="flex items-center gap-2 font-semibold text-emerald-800">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Invitation generated & copied to clipboard!</span>
+                  </div>
+                  {generatedLink && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={generatedLink}
+                        className="flex-1 px-2.5 py-1.5 rounded-lg bg-white border border-emerald-200 text-[11px] font-mono text-[#1B133C] select-all focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            navigator.clipboard.writeText(generatedLink);
+                          } catch {}
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-700 text-white font-semibold text-[11px] hover:bg-emerald-800 transition-colors"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
               <DialogFooter className="pt-2">
                 <button
                   type="button"
-                  onClick={() => setInviteModalOpen(false)}
+                  onClick={() => {
+                    setInviteModalOpen(false);
+                    setInviteSuccess(false);
+                    setGeneratedLink('');
+                    setInviteEmail('');
+                  }}
                   className="px-4 py-2 rounded-xl text-xs font-semibold text-[#1B133C] hover:bg-black/5"
                 >
-                  Cancel
+                  {inviteSuccess ? 'Done' : 'Cancel'}
                 </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold hover:bg-black shadow-xs"
-                >
-                  Send Invitation
-                </button>
+                {!inviteSuccess && (
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-[#1B133C] text-white text-xs font-semibold hover:bg-black shadow-xs"
+                  >
+                    Send Invitation
+                  </button>
+                )}
               </DialogFooter>
             </form>
           </DialogContent>

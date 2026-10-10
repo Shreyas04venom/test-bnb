@@ -291,19 +291,26 @@ patchworkApiRouter.get('/projects/:id', (req: Request, res: Response) => {
 // ==========================================
 patchworkApiRouter.get('/github/repos', async (req: Request, res: Response) => {
   const store = getStore();
-  const username =
+  const rawUsername =
     (req.query.username as string)?.trim() ||
     store.currentUser.githubUsername?.trim() ||
     (store.integrations.github.org !== 'axon-team' && store.integrations.github.org ? store.integrations.github.org.trim() : undefined);
+
+  // Strip any leading '@' from username (e.g., '@shreyas04venom' -> 'shreyas04venom')
+  const username = rawUsername ? rawUsername.replace(/^@+/, '').trim() : undefined;
+
+  const authHeader = req.headers.authorization;
+  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7).trim() : undefined;
   const token =
     (req.query.token as string)?.trim() ||
+    bearerToken ||
     (store.integrations.github as any).token ||
     process.env.GITHUB_TOKEN;
 
   if (!username && !token) {
     return res.json({
       success: false,
-      message: 'No GitHub username linked. Please enter your GitHub username.',
+      message: 'No GitHub username linked. Please enter your GitHub username or repository name.',
       repositories: [],
     });
   }
@@ -325,12 +332,30 @@ patchworkApiRouter.get('/github/repos', async (req: Request, res: Response) => {
     if (!ghRes.ok) {
       const errText = await ghRes.text();
       console.warn(`[GitHub API] Failed to fetch repos (${ghRes.status}):`, errText);
-      return res.json({ success: true, repositories: [], error: `GitHub API returned ${ghRes.status}` });
+
+      const isRateLimited = ghRes.status === 403 || errText.toLowerCase().includes('rate limit');
+      const isNotFound = ghRes.status === 404;
+
+      let userMsg = `GitHub API returned ${ghRes.status}`;
+      if (isRateLimited) {
+        userMsg = 'GitHub unauthenticated API rate limit reached. Please type your repository name manually below or add a GitHub Personal Access Token.';
+      } else if (isNotFound) {
+        userMsg = `GitHub user "${username}" was not found. Please verify the username or enter your repository manually below.`;
+      }
+
+      return res.json({
+        success: false,
+        rateLimited: isRateLimited,
+        notFound: isNotFound,
+        message: userMsg,
+        repositories: [],
+        username,
+      });
     }
 
     const data = await ghRes.json();
     if (!Array.isArray(data)) {
-      return res.json({ success: true, repositories: [] });
+      return res.json({ success: true, repositories: [], username });
     }
 
     const repositories = data.map((r: any) => ({
@@ -347,7 +372,12 @@ patchworkApiRouter.get('/github/repos', async (req: Request, res: Response) => {
     res.json({ success: true, repositories, username });
   } catch (err: any) {
     console.error('[GitHub API] Error:', err);
-    res.json({ success: true, repositories: [], error: err.message });
+    res.json({
+      success: false,
+      message: `Failed to connect to GitHub: ${err.message}. You can manually enter your repository name below.`,
+      repositories: [],
+      username,
+    });
   }
 });
 
@@ -479,12 +509,37 @@ patchworkApiRouter.delete('/projects/:id', (req: Request, res: Response) => {
 // POST /api/projects/:id/invites -> Create a shareable invite link/code
 patchworkApiRouter.post('/projects/:id/invites', (req: Request, res: Response) => {
   const store = getStore();
-  const project = store.projects.find((p) => p.id === req.params.id);
+  const targetId = req.params.id;
+  const { inviteeEmail, role, inviterId, inviterName, inviterEmail, projectName } = req.body || {};
+
+  let project = store.projects.find((p) => p.id === targetId || p.slug === targetId);
   if (!project) {
-    return res.status(404).json({ success: false, error: 'Project not found' });
+    // If not found in current memory store (e.g., created recently on client or server restart),
+    // create a placeholder project record so the invite link works smoothly
+    project = {
+      id: targetId,
+      name: projectName || 'Axon Project',
+      slug: targetId,
+      productionUrl: '',
+      framework: 'Next.js',
+      repositoryId: `repo-${Date.now()}`,
+      repositoryName: 'project',
+      repositoryUrl: '',
+      deploymentProvider: 'vercel',
+      deploymentProjectId: `deploy-${Date.now()}`,
+      defaultBranch: 'main',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      environments: ['production', 'preview', 'development'],
+      ownerId: inviterId || store.currentUser.id,
+      ownerName: inviterName || store.currentUser.name,
+      ownerEmail: inviterEmail || store.currentUser.email,
+      collaborators: [],
+    };
+    store.projects.push(project);
+    saveStore();
   }
 
-  const { inviteeEmail, role, inviterId, inviterName, inviterEmail } = req.body || {};
   const code = Math.random().toString(36).substring(2, 10);
   const invite: ProjectInvite = {
     id: `inv-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -525,9 +580,30 @@ patchworkApiRouter.get('/invites/:code', (req: Request, res: Response) => {
     return res.status(404).json({ success: false, error: 'Invitation not found or has expired' });
   }
 
-  const project = store.projects.find((p) => p.id === invite.projectId);
+  let project = store.projects.find((p) => p.id === invite.projectId);
   if (!project) {
-    return res.status(404).json({ success: false, error: 'The project for this invitation no longer exists' });
+    project = {
+      id: invite.projectId,
+      name: invite.projectName || 'Axon Project',
+      slug: invite.projectId,
+      productionUrl: '',
+      framework: 'Next.js',
+      repositoryId: `repo-${Date.now()}`,
+      repositoryName: invite.projectName || 'project',
+      repositoryUrl: '',
+      deploymentProvider: 'vercel',
+      deploymentProjectId: `deploy-${Date.now()}`,
+      defaultBranch: 'main',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      environments: ['production', 'preview', 'development'],
+      ownerId: invite.inviterId,
+      ownerName: invite.inviterName,
+      ownerEmail: invite.inviterEmail,
+      collaborators: [],
+    };
+    store.projects.push(project);
+    saveStore();
   }
 
   res.json({

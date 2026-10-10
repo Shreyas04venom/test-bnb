@@ -180,6 +180,30 @@
       "verifiedAt": "2026-09-28T17:13:44.297Z",
       "createdAt": "2026-09-28T17:13:44.298Z",
       "updatedAt": "2026-09-28T17:13:44.298Z"
+    },
+    {
+      "id": "test-proj-999",
+      "name": "Test Project",
+      "slug": "test-proj-999",
+      "productionUrl": "",
+      "framework": "Next.js",
+      "repositoryId": "repo-1791665837267",
+      "repositoryName": "project",
+      "repositoryUrl": "",
+      "deploymentProvider": "vercel",
+      "deploymentProjectId": "deploy-1791665837267",
+      "defaultBranch": "main",
+      "createdAt": "2026-10-10T20:57:17.267Z",
+      "updatedAt": "2026-10-10T20:57:17.267Z",
+      "environments": [
+        "production",
+        "preview",
+        "development"
+      ],
+      "ownerId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+      "ownerName": "vivan",
+      "ownerEmail": "vivanshetty45@gmail.com",
+      "collaborators": []
     }
   ],
   "patches": [
@@ -291,7 +315,62 @@
       "status": "active"
     }
   ],
-  "extensionSessions": [],
+  "extensionSessions": [
+    {
+      "id": "ext-sess-1791665837308",
+      "userId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+      "workspaceId": "ws-prod-1",
+      "deviceName": "Chrome Browser",
+      "browser": "Chrome 129",
+      "tokenHash": "hash_axon_ext_tok_179...",
+      "permissions": [
+        "read:projects",
+        "write:patches",
+        "read:collaborators",
+        "realtime:presence",
+        "audit:events"
+      ],
+      "createdAt": "2026-10-10T20:57:17.308Z",
+      "lastActiveAt": "Just now",
+      "expiresAt": "2026-11-09T20:57:17.308Z"
+    },
+    {
+      "id": "ext-sess-1791665837298",
+      "userId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+      "workspaceId": "ws-prod-1",
+      "deviceName": "Chrome Browser",
+      "browser": "Chrome 129",
+      "tokenHash": "hash_axon_ext_tok_179...",
+      "permissions": [
+        "read:projects",
+        "write:patches",
+        "read:collaborators",
+        "realtime:presence",
+        "audit:events"
+      ],
+      "createdAt": "2026-10-10T20:57:17.298Z",
+      "lastActiveAt": "Just now",
+      "expiresAt": "2026-11-09T20:57:17.298Z"
+    },
+    {
+      "id": "ext-sess-1791665066496",
+      "userId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+      "workspaceId": "ws-prod-1",
+      "deviceName": "Chrome Browser",
+      "browser": "Chrome 129",
+      "tokenHash": "hash_axon_ext_tok_179...",
+      "permissions": [
+        "read:projects",
+        "write:patches",
+        "read:collaborators",
+        "realtime:presence",
+        "audit:events"
+      ],
+      "createdAt": "2026-10-10T20:44:26.496Z",
+      "lastActiveAt": "Just now",
+      "expiresAt": "2026-11-09T20:44:26.496Z"
+    }
+  ],
   "deployments": [
     {
       "id": "DEP-720",
@@ -318,6 +397,100 @@
   ],
   "verifications": [],
   "auditLogs": [
+    {
+      "id": "aud-1791665837308-dxhl",
+      "action": "EXTENSION_PAIRED",
+      "user": {
+        "id": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "name": "vivan",
+        "email": "vivanshetty45@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZiQmk1Mk96aTZQWXVqYWV6TTZzV25ScTQifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "githubUsername": "codevivan"
+      },
+      "timestamp": "2026-10-10T20:57:17.308Z",
+      "ip": "127.0.0.1",
+      "userAgent": "node",
+      "result": "success",
+      "metadata": {
+        "device": "Chrome Browser",
+        "browser": "Chrome 129"
+      }
+    },
+    {
+      "id": "aud-1791665837298-g020",
+      "action": "EXTENSION_PAIRED",
+      "user": {
+        "id": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "name": "vivan",
+        "email": "vivanshetty45@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZiQmk1Mk96aTZQWXVqYWV6TTZzV25ScTQifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "githubUsername": "codevivan"
+      },
+      "timestamp": "2026-10-10T20:57:17.298Z",
+      "ip": "127.0.0.1",
+      "userAgent": "node",
+      "result": "success",
+      "metadata": {
+        "device": "Chrome Browser",
+        "browser": "Chrome 129"
+      }
+    },
+    {
+      "id": "aud-1791665837274-nli8",
+      "action": "INVITATION_SENT",
+      "user": {
+        "id": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "name": "vivan",
+        "email": "vivanshetty45@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZiQmk1Mk96aTZQWXVqYWV6TTZzV25ScTQifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "githubUsername": "codevivan"
+      },
+      "timestamp": "2026-10-10T20:57:17.274Z",
+      "ip": "127.0.0.1",
+      "userAgent": "node",
+      "result": "success",
+      "metadata": {
+        "inviteCode": "mdi8w1r8",
+        "role": "developer"
+      },
+      "projectId": "test-proj-999",
+      "projectName": "Test Project"
+    },
+    {
+      "id": "aud-1791665066501-3vy6",
+      "action": "EXTENSION_PAIRED",
+      "user": {
+        "id": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "name": "vivan",
+        "email": "vivanshetty45@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZiQmk1Mk96aTZQWXVqYWV6TTZzV25ScTQifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "githubUsername": "codevivan"
+      },
+      "timestamp": "2026-10-10T20:44:26.502Z",
+      "ip": "127.0.0.1",
+      "userAgent": "node",
+      "result": "success",
+      "metadata": {
+        "device": "Chrome Browser",
+        "browser": "Chrome 129"
+      }
+    },
     {
       "id": "aud-1790620936435-0jbm",
       "action": "PROJECT_CREATED",
@@ -469,7 +642,20 @@
       "rollbackPossible": true
     }
   ],
-  "invites": [],
+  "invites": [
+    {
+      "id": "inv-1791665837271-n8nz",
+      "code": "mdi8w1r8",
+      "projectId": "test-proj-999",
+      "projectName": "Test Project",
+      "inviterId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+      "inviterName": "vivan",
+      "inviterEmail": "vivanshetty45@gmail.com",
+      "role": "developer",
+      "status": "pending",
+      "createdAt": "2026-10-10T20:57:17.271Z"
+    }
+  ],
   "integrations": {
     "github": {
       "connected": false,

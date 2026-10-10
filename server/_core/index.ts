@@ -28,6 +28,15 @@ export function createServerApp() {
       createContext,
     })
   );
+  // Global API JSON Error Handler to ensure API routes never return HTML error pages
+  app.use("/api", (err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error("[API Error]", err);
+    res.status(err.status || 500).json({
+      success: false,
+      error: err.message || "An unexpected server error occurred",
+    });
+  });
+
   return app;
 }
 

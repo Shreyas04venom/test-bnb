@@ -56,33 +56,48 @@ export default function ProjectsPage() {
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [reposError, setReposError] = useState<string | null>(null);
 
+  const [manualRepoMode, setManualRepoMode] = useState<boolean>(false);
+
   // Keep active username in sync if Clerk loads later
   useEffect(() => {
     if (detectedUsername && !activeGithubUsername) {
-      setActiveGithubUsername(detectedUsername);
+      setActiveGithubUsername(detectedUsername.replace(/^@+/, '').trim());
     }
   }, [detectedUsername, activeGithubUsername]);
 
   const loadRepos = (usernameToFetch: string) => {
-    if (!usernameToFetch.trim()) return;
+    const cleanUser = usernameToFetch.replace(/^@+/, '').trim();
+    if (!cleanUser) return;
     setLoadingRepos(true);
     setReposError(null);
-    fetch(`/api/github/repos?username=${encodeURIComponent(usernameToFetch.trim())}`)
+    fetch(`/api/github/repos?username=${encodeURIComponent(cleanUser)}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && Array.isArray(data.repositories)) {
+        if (data.success && Array.isArray(data.repositories) && data.repositories.length > 0) {
           setReposList(data.repositories);
+          setManualRepoMode(false);
           if (typeof window !== 'undefined') {
-            localStorage.setItem('axon_github_username', usernameToFetch.trim());
+            localStorage.setItem('axon_github_username', cleanUser);
           }
         } else {
-          setReposList([]);
-          setReposError(data.message || 'No repositories found or rate-limited.');
+          setReposList(data.repositories || []);
+          if (data.message) {
+            setReposError(data.message);
+          } else if (data.rateLimited) {
+            setReposError('GitHub API rate limit reached. You can enter your repository manually below.');
+          } else {
+            setReposError(`No public repositories found for @${cleanUser}. You can enter your repository manually below.`);
+          }
+          // If empty or rate limited, automatically offer manual mode
+          if (!repoName) {
+            setManualRepoMode(true);
+          }
         }
       })
       .catch((err) => {
         console.error('Failed to load GitHub repos:', err);
-        setReposError('Failed to load repositories from GitHub.');
+        setReposError('Failed to load repositories from GitHub. You can enter your repository manually below.');
+        setManualRepoMode(true);
       })
       .finally(() => setLoadingRepos(false));
   };
@@ -95,7 +110,7 @@ export default function ProjectsPage() {
 
   const handleApplyCustomUsername = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const trimmed = manualGithubInput.trim();
+    const trimmed = manualGithubInput.replace(/^@+/, '').trim();
     if (!trimmed) return;
     setActiveGithubUsername(trimmed);
     setIsChangingAccount(false);
@@ -357,6 +372,13 @@ export default function ProjectsPage() {
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-[#1B133C]">GitHub Repository</label>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setManualRepoMode(!manualRepoMode)}
+                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold underline underline-offset-2"
+                    >
+                      {manualRepoMode ? 'Select from list' : 'Type repo manually'}
+                    </button>
                     <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md font-mono font-medium flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                       @{activeGithubUsername}
@@ -367,45 +389,98 @@ export default function ProjectsPage() {
                         setManualGithubInput(activeGithubUsername);
                         setIsChangingAccount(true);
                       }}
-                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold underline underline-offset-2"
+                      className="text-[10px] text-slate-500 hover:text-slate-800 font-medium underline underline-offset-2"
                     >
-                      Switch Account
+                      Switch
                     </button>
                   </div>
                 </div>
-                <div className="relative">
-                  <select
-                    value={repoName}
-                    onChange={(e) => handleRepoSelect(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-black/10 bg-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-50"
-                    required
-                    disabled={loadingRepos || !activeGithubUsername}
-                  >
-                    <option value="" disabled>
-                      {loadingRepos
-                        ? `-- Fetching repositories for @${activeGithubUsername}... --`
-                        : reposList.length > 0
-                        ? '-- Select repository from your GitHub account --'
-                        : `-- No public repositories found for @${activeGithubUsername} --`}
-                    </option>
-                    {reposList.map((r) => (
-                      <option key={r.fullName} value={r.fullName}>
-                        {r.fullName} (branch: {r.defaultBranch || 'main'})
+
+                {manualRepoMode ? (
+                  <div className="space-y-1">
+                    <input
+                      type="text"
+                      value={repoName}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRepoName(val);
+                        if (val && (!name || name === '')) {
+                          const parts = val.split('/');
+                          const short = parts[parts.length - 1];
+                          setName(
+                            short
+                              .split(/[-_]/)
+                              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                              .join(' ')
+                          );
+                        }
+                      }}
+                      placeholder="e.g. shreyas04venom/my-app or repo-name"
+                      className="w-full px-3 py-2.5 rounded-xl border border-black/10 bg-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      required
+                    />
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] text-muted-foreground">
+                        Enter owner/repo or repository name directly.
+                      </p>
+                      {reposList.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setManualRepoMode(false)}
+                          className="text-[11px] text-indigo-600 hover:underline font-medium"
+                        >
+                          Pick from loaded list ({reposList.length})
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <select
+                      value={repoName}
+                      onChange={(e) => {
+                        if (e.target.value === '__manual__') {
+                          setManualRepoMode(true);
+                        } else {
+                          handleRepoSelect(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3 py-2.5 rounded-xl border border-black/10 bg-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-50"
+                      required
+                      disabled={loadingRepos}
+                    >
+                      <option value="" disabled>
+                        {loadingRepos
+                          ? `-- Fetching repositories for @${activeGithubUsername}... --`
+                          : reposList.length > 0
+                          ? '-- Select repository from your GitHub account --'
+                          : `-- No public repositories found for @${activeGithubUsername} --`}
                       </option>
-                    ))}
-                  </select>
-                  {loadingRepos && (
-                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground absolute right-3 top-3 pointer-events-none" />
-                  )}
-                </div>
-                {reposError && (
-                  <p className="text-[11px] text-rose-600 font-medium">
-                    {reposError}
-                  </p>
+                      {reposList.map((r) => (
+                        <option key={r.fullName} value={r.fullName}>
+                          {r.fullName} (branch: {r.defaultBranch || 'main'})
+                        </option>
+                      ))}
+                      <option value="__manual__">✏️ + Enter custom or private repo manually...</option>
+                    </select>
+                    {loadingRepos && (
+                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground absolute right-3 top-3 pointer-events-none" />
+                    )}
+                  </div>
                 )}
-                <p className="text-[11px] text-muted-foreground">
-                  Select a live repository to configure visual inspection.
-                </p>
+
+                {reposError && (
+                  <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-start justify-between gap-2">
+                    <span>{reposError}</span>
+                    <button
+                      type="button"
+                      onClick={() => loadRepos(activeGithubUsername)}
+                      className="text-amber-800 underline font-semibold shrink-0"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
