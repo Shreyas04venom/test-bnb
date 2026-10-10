@@ -56,98 +56,16 @@ export interface AxonStoreData {
   invites: ProjectInvite[];
 }
 
-const DATA_DIR = path.resolve(process.cwd(), 'server', 'data');
+import { SEED_STORE_DATA } from './seedData';
+
+const IS_VERCEL = Boolean(process.env.VERCEL);
+const DATA_DIR = IS_VERCEL ? '/tmp' : path.resolve(process.cwd(), 'server', 'data');
 const STORE_FILE = path.join(DATA_DIR, 'axon-store.json');
 
-const DEFAULT_USER: User = {
-  id: 'usr-owner-1',
-  name: 'Workspace Lead',
-  email: 'developer@axon.dev',
-  avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=Axon',
-  role: 'owner',
-  cursorColor: '#6366F1',
-  timezone: 'UTC',
-  githubUsername: undefined,
-};
-
-const DEFAULT_WORKSPACE: Workspace = {
-  id: 'ws-prod-1',
-  name: 'Axon Production Workspace',
-  slug: 'axon-prod',
-  ownerId: 'usr-owner-1',
-  plan: 'Enterprise',
-  membersCount: 1,
-  createdAt: new Date().toISOString(),
-  setupCompleted: false,
-};
-
-const DEFAULT_VERSIONS: VersionItem[] = [];
-
-const DEFAULT_STORE: AxonStoreData = {
-  workspace: DEFAULT_WORKSPACE,
-  currentUser: DEFAULT_USER,
-  projects: [],
-  patches: [],
-  collaborators: [
-    {
-      id: 'mem-1',
-      workspaceId: 'ws-prod-1',
-      userId: 'usr-owner-1',
-      user: DEFAULT_USER,
-      role: 'owner',
-      joinedAt: new Date().toISOString(),
-      status: 'active',
-    },
-  ],
-  extensionSessions: [],
-  deployments: [],
-  verifications: [],
-  auditLogs: [],
-  conflicts: [],
-  versions: [],
-  invites: [],
-  integrations: {
-    github: {
-      connected: false,
-      org: '',
-      accountType: 'organization',
-      appInstalled: false,
-      repositories: [],
-      permissions: ['repo', 'workflow'],
-      lastSync: '',
-    },
-    vercel: {
-      connected: false,
-      team: '',
-      projects: [],
-      domains: [],
-      lastSync: '',
-    },
-    netlify: {
-      connected: false,
-      team: '',
-      sites: [],
-      lastSync: '',
-    },
-    supabase: {
-      connected: true,
-      projectUrl: 'https://ufmybpckkpxfrxqlwdps.supabase.co',
-      anonKeyConfigured: true,
-      serviceRoleConfigured: false,
-      realtimeEnabled: true,
-      lastSync: new Date().toISOString(),
-    },
-    ai: {
-      provider: 'gemini',
-      model: 'gemini-1.5-pro',
-      temperature: 0.2,
-      allowFrontendModifications: true,
-      allowBackendModifications: false,
-      requireApprovalForBackend: true,
-      requireApprovalForHighRisk: true,
-    },
-  },
-};
+const DEFAULT_USER: User = SEED_STORE_DATA.currentUser;
+const DEFAULT_WORKSPACE: Workspace = SEED_STORE_DATA.workspace;
+const DEFAULT_VERSIONS: VersionItem[] = SEED_STORE_DATA.versions || [];
+const DEFAULT_STORE: AxonStoreData = { ...SEED_STORE_DATA };
 
 // In-memory runtime state
 let storeData: AxonStoreData = { ...DEFAULT_STORE };
@@ -155,12 +73,12 @@ const livePresence: Map<string, PresenceRecord> = new Map();
 const pairingCodes: Map<string, PairingCodeRecord> = new Map();
 
 function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    try {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
-    } catch (err) {
-      console.warn('[AxonStore] Could not create data dir:', err);
     }
+  } catch (err) {
+    console.warn('[AxonStore] Could not create data dir:', err);
   }
 }
 
@@ -174,6 +92,8 @@ export function loadStore(): AxonStoreData {
         ...DEFAULT_STORE,
         ...parsed,
         workspace: { ...DEFAULT_STORE.workspace, ...(parsed.workspace || {}) },
+        currentUser: { ...DEFAULT_STORE.currentUser, ...(parsed.currentUser || {}) },
+        projects: Array.isArray(parsed.projects) ? parsed.projects : DEFAULT_STORE.projects,
         integrations: {
           ...DEFAULT_STORE.integrations,
           ...(parsed.integrations || {}),
@@ -184,16 +104,31 @@ export function loadStore(): AxonStoreData {
           ai: { ...DEFAULT_STORE.integrations.ai, ...(parsed.integrations?.ai || {}) },
         },
         versions: Array.isArray(parsed.versions) && parsed.versions.length > 0 ? parsed.versions : DEFAULT_VERSIONS,
-        verifications: Array.isArray(parsed.verifications) ? parsed.verifications : [],
-        invites: Array.isArray(parsed.invites) ? parsed.invites : [],
+        verifications: Array.isArray(parsed.verifications) ? parsed.verifications : DEFAULT_STORE.verifications,
+        invites: Array.isArray(parsed.invites) ? parsed.invites : DEFAULT_STORE.invites,
       };
       return storeData;
+    }
+
+    // If running in Vercel and /tmp doesn't have store yet, check project server/data directory
+    if (IS_VERCEL) {
+      const fallbackLocalPath = path.resolve(process.cwd(), 'server', 'data', 'axon-store.json');
+      if (fs.existsSync(fallbackLocalPath)) {
+        try {
+          const raw = fs.readFileSync(fallbackLocalPath, 'utf-8');
+          const parsed = JSON.parse(raw);
+          storeData = { ...DEFAULT_STORE, ...parsed };
+          return storeData;
+        } catch (_) {}
+      }
     }
   } catch (err) {
     console.warn('[AxonStore] Could not load persisted store:', err);
   }
   storeData = { ...DEFAULT_STORE };
-  saveStore();
+  try {
+    saveStore();
+  } catch (_) {}
   return storeData;
 }
 
@@ -202,7 +137,7 @@ export function saveStore(): void {
     ensureDataDir();
     fs.writeFileSync(STORE_FILE, JSON.stringify(storeData, null, 2), 'utf-8');
   } catch (err) {
-    console.warn('[AxonStore] Could not persist store to disk:', err);
+    console.warn('[AxonStore] Could not persist store to disk (non-fatal):', err);
   }
 }
 

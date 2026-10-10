@@ -277,7 +277,7 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
               const resolvedActiveProject = hasActiveProject ? currentActive : (projectsList[0]?.id || '');
 
               set({
-                workspace: d.workspace ? { ...get().workspace, ...d.workspace } : get().workspace,
+                workspace: d.workspace || get().workspace,
                 currentUser: resolvedUser,
                 projects: projectsList,
                 patches: d.patches || [],

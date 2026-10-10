@@ -27,8 +27,14 @@ import {
 
 export default function ProjectsPage() {
   const { user: clerkUser } = useUser();
-  const { projects, createProject, verifyProjectOwnership, patches, integrations, currentUser } = usePatchworkStore();
+  const { projects, createProject, verifyProjectOwnership, patches, integrations, currentUser, fetchInitialState } = usePatchworkStore();
   const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  useEffect(() => {
+    const userId = clerkUser?.id || currentUser?.id || currentUser?.clerkId;
+    const email = clerkUser?.primaryEmailAddress?.emailAddress || currentUser?.email;
+    fetchInitialState(userId, email);
+  }, [clerkUser?.id, clerkUser?.primaryEmailAddress?.emailAddress]);
 
   // Detect connected GitHub account from Clerk or store or localStorage (strictly per-user)
   const clerkGithub = clerkUser?.externalAccounts?.find(

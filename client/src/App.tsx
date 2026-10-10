@@ -110,7 +110,6 @@ function ClerkUserSync() {
           isEmailVerified,
           connectedProviders,
         });
-        // Persist profile to server so backend has active user credentials and githubUsername
         fetch("/api/user", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -123,11 +122,12 @@ function ClerkUserSync() {
             githubUsername,
           }),
         }).catch(() => {});
-        // Immediately fetch user-scoped projects
-        fetchInitialState(user.id, email);
       }
+
+      // Always synchronize fresh state for the verified Clerk user
+      fetchInitialState(user.id, email);
     }
-  }, [isLoaded, isSignedIn, user, currentUser]);
+  }, [isLoaded, isSignedIn, user?.id, user?.primaryEmailAddress?.emailAddress]);
 
   return null;
 }
