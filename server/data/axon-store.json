@@ -55,11 +55,27 @@
           },
           "role": "owner",
           "joinedAt": "2026-10-10T21:05:47.736Z"
+        },
+        {
+          "id": "collab-1791669209679",
+          "projectId": "proj-1791666347736",
+          "userId": "usr-friend-99",
+          "user": {
+            "id": "usr-friend-99",
+            "name": "Rahul Sharma",
+            "email": "friend.testing@gmail.com",
+            "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=Rahul%20Sharma",
+            "role": "developer",
+            "cursorColor": "#EC4899",
+            "timezone": "UTC"
+          },
+          "role": "developer",
+          "joinedAt": "2026-10-10T21:53:29.679Z"
         }
       ],
       "verifiedAt": "2026-10-10T21:05:47.736Z",
       "createdAt": "2026-10-10T21:05:47.736Z",
-      "updatedAt": "2026-10-10T21:05:47.736Z"
+      "updatedAt": "2026-10-10T21:52:09.216Z"
     },
     {
       "id": "proj-1790620936435",
@@ -248,6 +264,58 @@
   ],
   "patches": [
     {
+      "id": "PW-102",
+      "projectId": "proj-1791666347736",
+      "workspaceId": "ws-prod-1",
+      "author": {
+        "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "name": "Shreyas Mahajan",
+        "email": "shreyasmahajan0306@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "githubUsername": "shreyas04venom"
+      },
+      "title": "test: verify real git add commit and push pipeline",
+      "description": "Git commit 8202be9 dispatched from Axon Chrome Extension directly to main",
+      "status": "DEPLOYED",
+      "riskLevel": "LOW",
+      "branchName": "main",
+      "commitSha": "8202be9",
+      "previewUrl": "https://curastyl-vcet.vercel.app",
+      "files": [
+        {
+          "filename": "src/styles/overrides.css",
+          "category": "frontend",
+          "changeType": "modified",
+          "additions": 14,
+          "deletions": 2,
+          "diffSummary": "Committed visual DOM styling and token overrides via Axon Extension [8202be9]"
+        }
+      ],
+      "comments": [],
+      "reviews": [],
+      "source": "extension",
+      "createdAt": "2026-10-10T21:52:09.213Z",
+      "updatedAt": "2026-10-10T21:52:09.213Z",
+      "aiSummary": {
+        "explanation": "Staged and committed 1 visual AST changes directly into Git branch main.",
+        "why": "Immediate visual production hotfix applied via Axon Visual Inspector.",
+        "affectedComponents": [
+          "Visual DOM Styles",
+          "src/styles/overrides.css"
+        ],
+        "potentialRisks": [
+          "Verify mobile breakpoint scaling"
+        ],
+        "dependencies": [
+          "DOM Token Sync"
+        ]
+      }
+    },
+    {
       "id": "PW-101",
       "projectId": "proj-live",
       "workspaceId": "ws-prod-1",
@@ -352,6 +420,23 @@
       },
       "role": "viewer",
       "joinedAt": "2026-09-28T15:50:37.745Z",
+      "status": "active"
+    },
+    {
+      "id": "mem-1791669209679",
+      "workspaceId": "ws-prod-1",
+      "userId": "usr-friend-99",
+      "user": {
+        "id": "usr-friend-99",
+        "name": "Rahul Sharma",
+        "email": "friend.testing@gmail.com",
+        "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=Rahul%20Sharma",
+        "role": "developer",
+        "cursorColor": "#EC4899",
+        "timezone": "UTC"
+      },
+      "role": "developer",
+      "joinedAt": "2026-10-10T21:53:29.679Z",
       "status": "active"
     }
   ],
@@ -467,6 +552,37 @@
   ],
   "deployments": [
     {
+      "id": "DEP-497",
+      "projectId": "proj-1791666347736",
+      "patchId": "PW-102",
+      "environment": "production",
+      "provider": "vercel",
+      "commitSha": "8202be9",
+      "branch": "main",
+      "author": {
+        "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "name": "Shreyas Mahajan",
+        "email": "shreyasmahajan0306@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "githubUsername": "shreyas04venom"
+      },
+      "status": "READY",
+      "previewUrl": "https://curastyl-vcet.vercel.app",
+      "durationSeconds": 19,
+      "createdAt": "2026-10-10T21:52:09.216Z",
+      "logs": [
+        "git add . [completed]",
+        "git commit -m \"test: verify real git add commit and push pipeline\" -> 8202be9",
+        "git push origin main -> Synchronized",
+        "Automated 12-step verification suite passed (99.8% visual similarity)",
+        "Deployment DEP-497 compiled and promoted to Production"
+      ]
+    },
+    {
       "id": "DEP-720",
       "projectId": "proj-live",
       "patchId": "PW-101",
@@ -489,8 +605,208 @@
       "createdAt": "2026-09-28T17:00:35.798Z"
     }
   ],
-  "verifications": [],
+  "verifications": [
+    {
+      "id": "ver-1791669129215-8ntt",
+      "patchId": "PW-102",
+      "projectId": "proj-1791666347736",
+      "status": "passed",
+      "totalChecks": 12,
+      "passedChecks": 12,
+      "visualSimilarityPercent": 99.8,
+      "potentialRegression": "low",
+      "startedAt": "2026-10-10T21:52:09.216Z",
+      "completedAt": "2026-10-10T21:52:09.216Z",
+      "checks": [
+        {
+          "id": "vc-1",
+          "stepNumber": 1,
+          "name": "Git Commit Verification",
+          "description": "Git add and commit verified on HEAD [8202be9]",
+          "status": "passed",
+          "durationMs": 410
+        },
+        {
+          "id": "vc-2",
+          "stepNumber": 2,
+          "name": "Production Build",
+          "description": "Production bundle compilation and AST integrity",
+          "status": "passed",
+          "durationMs": 1200
+        },
+        {
+          "id": "vc-3",
+          "stepNumber": 3,
+          "name": "Typecheck",
+          "description": "TypeScript strict checking",
+          "status": "passed",
+          "durationMs": 750
+        },
+        {
+          "id": "vc-4",
+          "stepNumber": 4,
+          "name": "Token Validation",
+          "description": "Design token syntax and CSS variable checking",
+          "status": "passed",
+          "durationMs": 380
+        },
+        {
+          "id": "vc-5",
+          "stepNumber": 5,
+          "name": "Application Health",
+          "description": "HTTP healthcheck returns 200 OK",
+          "status": "passed",
+          "durationMs": 510
+        },
+        {
+          "id": "vc-6",
+          "stepNumber": 6,
+          "name": "DOM Hydration",
+          "description": "DOM ready & hydration complete without errors",
+          "status": "passed",
+          "durationMs": 690
+        },
+        {
+          "id": "vc-7",
+          "stepNumber": 7,
+          "name": "Selector Integrity",
+          "description": "Target selectors matched in DOM tree",
+          "status": "passed",
+          "durationMs": 180
+        },
+        {
+          "id": "vc-8",
+          "stepNumber": 8,
+          "name": "Interaction Tests",
+          "description": "Browser interaction and click listeners verified",
+          "status": "passed",
+          "durationMs": 980
+        },
+        {
+          "id": "vc-9",
+          "stepNumber": 9,
+          "name": "Link Checks",
+          "description": "All href targets reachable",
+          "status": "passed",
+          "durationMs": 820
+        },
+        {
+          "id": "vc-10",
+          "stepNumber": 10,
+          "name": "Responsive Tests",
+          "description": "Viewport matrix: Mobile, Tablet, Desktop passed",
+          "status": "passed",
+          "durationMs": 1900
+        },
+        {
+          "id": "vc-11",
+          "stepNumber": 11,
+          "name": "Visual Regression",
+          "description": "Perceptual screenshot diffing (99.8% match)",
+          "status": "passed",
+          "durationMs": 1450
+        },
+        {
+          "id": "vc-12",
+          "stepNumber": 12,
+          "name": "Console Error Detection",
+          "description": "Zero unhandled exceptions or layout shifts",
+          "status": "passed",
+          "durationMs": 250
+        }
+      ]
+    }
+  ],
   "auditLogs": [
+    {
+      "id": "aud-1791669209679-mxca",
+      "action": "COLLABORATOR_INVITED",
+      "user": {
+        "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "name": "Shreyas Mahajan",
+        "email": "shreyasmahajan0306@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "githubUsername": "shreyas04venom"
+      },
+      "timestamp": "2026-10-10T21:53:29.679Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.9444",
+      "result": "success",
+      "metadata": {
+        "action": "INVITE_ACCEPTED",
+        "email": "friend.testing@gmail.com",
+        "role": "developer",
+        "inviteCode": "9nfol1nh"
+      },
+      "projectId": "proj-1791666347736",
+      "projectName": "Curastyl PitchX VCET"
+    },
+    {
+      "id": "aud-1791669167350-y3g3",
+      "action": "INVITATION_SENT",
+      "user": {
+        "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "name": "Shreyas Mahajan",
+        "email": "shreyasmahajan0306@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "githubUsername": "shreyas04venom"
+      },
+      "timestamp": "2026-10-10T21:52:47.350Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.9444",
+      "result": "success",
+      "metadata": {
+        "inviteCode": "9nfol1nh",
+        "inviteeEmail": "friend.testing@gmail.com",
+        "role": "developer"
+      },
+      "projectId": "proj-1791666347736",
+      "projectName": "Curastyl PitchX VCET"
+    },
+    {
+      "id": "aud-1791669129218-urvj",
+      "action": "DEPLOYMENT_COMPLETED",
+      "user": {
+        "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "name": "Shreyas Mahajan",
+        "email": "shreyasmahajan0306@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "githubUsername": "shreyas04venom"
+      },
+      "timestamp": "2026-10-10T21:52:09.218Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.9444",
+      "result": "success",
+      "metadata": {
+        "commitSha": "8202be9",
+        "fullSha": "8202be9705eb18f258d6b75e4567e407117922a8",
+        "branch": "main",
+        "version": "v1.2.0",
+        "deploymentId": "DEP-497",
+        "commitMessage": "test: verify real git add commit and push pipeline",
+        "gitPipeline": [
+          "git add -A (visual tokens & overrides staged)",
+          "git commit -m \"test: verify real git add commit and push pipeline\"",
+          "HEAD resolved: 8202be9 (8202be9705eb18f258d6b75e4567e407117922a8)",
+          "git push origin main OK: Synchronized"
+        ],
+        "pushSuccess": true
+      },
+      "projectId": "proj-1791666347736",
+      "patchId": "PW-102"
+    },
     {
       "id": "aud-1791666501530-o51m",
       "action": "EXTENSION_PAIRED",
@@ -837,6 +1153,27 @@
   "conflicts": [],
   "versions": [
     {
+      "version": "v1.2.0",
+      "commitSha": "8202be9",
+      "patchId": "PW-102",
+      "title": "test: verify real git add commit and push pipeline",
+      "author": {
+        "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "name": "Shreyas Mahajan",
+        "email": "shreyasmahajan0306@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "githubUsername": "shreyas04venom"
+      },
+      "deployedAt": "2026-10-10T21:52:09.215Z",
+      "status": "active",
+      "deploymentId": "DEP-497",
+      "rollbackPossible": true
+    },
+    {
       "version": "v1.1.0",
       "commitSha": "4ccab97",
       "patchId": "PW-101",
@@ -851,12 +1188,26 @@
         "timezone": "UTC"
       },
       "deployedAt": "2026-09-28T17:00:35.785Z",
-      "status": "active",
+      "status": "superseded",
       "deploymentId": "DEP-720",
       "rollbackPossible": true
     }
   ],
   "invites": [
+    {
+      "id": "inv-1791669167348-e6fl",
+      "code": "9nfol1nh",
+      "projectId": "proj-1791666347736",
+      "projectName": "Curastyl PitchX VCET",
+      "inviterId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+      "inviterName": "Shreyas Mahajan",
+      "inviterEmail": "shreyasmahajan0306@gmail.com",
+      "inviteeEmail": "friend.testing@gmail.com",
+      "role": "developer",
+      "status": "accepted",
+      "createdAt": "2026-10-10T21:52:47.348Z",
+      "acceptedAt": "2026-10-10T21:53:29.679Z"
+    },
     {
       "id": "inv-1791666475255-i6nc",
       "code": "st3fdusb",
