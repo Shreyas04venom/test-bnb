@@ -184,6 +184,7 @@ export function loadStore(): AxonStoreData {
           ai: { ...DEFAULT_STORE.integrations.ai, ...(parsed.integrations?.ai || {}) },
         },
         versions: Array.isArray(parsed.versions) && parsed.versions.length > 0 ? parsed.versions : DEFAULT_VERSIONS,
+        verifications: Array.isArray(parsed.verifications) ? parsed.verifications : [],
         invites: Array.isArray(parsed.invites) ? parsed.invites : [],
       };
       return storeData;

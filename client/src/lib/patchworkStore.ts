@@ -136,6 +136,7 @@ export interface PatchworkStoreState {
   acceptProjectInvite: (code: string, userData?: { id?: string; name?: string; email?: string; avatar?: string }) => Promise<{ success: boolean; project?: Project; error?: string }>;
   declineProjectInvite: (code: string) => Promise<boolean>;
   removeProjectCollaborator: (projectId: string, userId: string) => Promise<void>;
+  fetchProjectCollaborators: (projectId: string) => Promise<void>;
 
   // Patch actions
   createPatch: (patch: Partial<Patch> & { title: string; projectId: string }) => Promise<Patch>;
@@ -288,6 +289,7 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
                 auditLogs: d.auditLogs || [],
                 conflicts: d.conflicts || [],
                 versions: d.versions || get().versions,
+                verificationRun: Array.isArray(d.verifications) && d.verifications.length > 0 ? d.verifications[0] : get().verificationRun,
                 integrations: {
                   ...curIntegrations,
                   ...(d.integrations || {}),
@@ -369,9 +371,53 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
         }
       },
 
-      syncPresence: async () => {
+      fetchProjectCollaborators: async (projectId: string) => {
         try {
-          const activeProjectId = get().activeProjectId;
+          const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/collaborators`);
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success && Array.isArray(json.collaborators)) {
+              set((state) => ({
+                projects: state.projects.map((p) =>
+                  p.id === projectId ? { ...p, collaborators: json.collaborators } : p
+                ),
+              }));
+            }
+          }
+        } catch (err) {
+          console.warn('[PatchworkStore] fetchProjectCollaborators failed:', err);
+        }
+      },
+
+      syncPresence: async () => {
+        const curUser = get().currentUser || INITIAL_USER;
+        const activeProjectId = get().activeProjectId;
+
+        // 1. Post self presence heartbeat so current user is registered in multiplayer
+        try {
+          const win = typeof window !== 'undefined' ? (window as any) : {};
+          await fetch('/api/extension/presence', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: curUser.id,
+              userName: curUser.name,
+              userColor: curUser.cursorColor || '#6366F1',
+              userAvatar: curUser.avatar,
+              role: curUser.role || 'developer',
+              projectId: activeProjectId || '',
+              route: typeof window !== 'undefined' ? window.location.pathname : '/',
+              cursorX: typeof win.__axon_cursorX === 'number' ? win.__axon_cursorX : 50,
+              cursorY: typeof win.__axon_cursorY === 'number' ? win.__axon_cursorY : 50,
+              selectedElement: '',
+            }),
+          });
+        } catch {
+          // ignore heartbeat hiccup
+        }
+
+        // 2. Fetch all online presence records
+        try {
           const url = activeProjectId
             ? `/api/extension/presence?projectId=${encodeURIComponent(activeProjectId)}`
             : '/api/extension/presence';
@@ -383,7 +429,7 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
                 presence: json.presence.map((p: any) => ({
                   userId: p.userId,
                   name: p.userName,
-                  avatar: p.userAvatar || `https://api.dicebear.com/7.x/initials/svg?seed=${p.userName}`,
+                  avatar: p.userAvatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(p.userName || 'Member')}`,
                   cursorColor: p.userColor || '#6366F1',
                   currentRoute: p.route || '/',
                   currentProject: p.projectId || '',
@@ -397,6 +443,11 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
           }
         } catch {
           // ignore network hiccups
+        }
+
+        // 3. Periodically sync project collaborators from server so friends show up in multiplayer instantly
+        if (activeProjectId) {
+          get().fetchProjectCollaborators(activeProjectId);
         }
       },
 

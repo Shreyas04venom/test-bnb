@@ -29,6 +29,8 @@ export default function CollaborationPage() {
     createProjectInvite,
     removeProjectCollaborator,
     extensionSessions,
+    syncPresence,
+    fetchProjectCollaborators,
   } = usePatchworkStore();
 
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -45,37 +47,57 @@ export default function CollaborationPage() {
 
   const activeProject = projects.find((p) => p.id === activeProjectId) || projects[0];
 
-  // Derive project-scoped collaborators
-  const projectCollaborators = React.useMemo(() => {
-    if (!activeProject) return [];
-    if (Array.isArray(activeProject.collaborators) && activeProject.collaborators.length > 0) {
-      // Deduplicate by email or userId
-      return activeProject.collaborators.filter((c, idx, arr) => {
-        const email = c.user?.email?.toLowerCase().trim();
-        return (
-          arr.findIndex(
-            (x) =>
-              (email && x.user?.email?.toLowerCase().trim() === email) ||
-              x.userId === c.userId
-          ) === idx
-        );
-      });
+  // Continuous real-time multiplayer heartbeat & collaborator sync
+  useEffect(() => {
+    syncPresence();
+    if (activeProject?.id) {
+      fetchProjectCollaborators(activeProject.id);
     }
 
-    // Fallback: active project owner as sole collaborator
+    const interval = setInterval(() => {
+      syncPresence();
+      if (activeProject?.id) {
+        fetchProjectCollaborators(activeProject.id);
+      }
+    }, 2500);
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (typeof window !== 'undefined') {
+        (window as any).__axon_cursorX = Math.round((e.clientX / window.innerWidth) * 100);
+        (window as any).__axon_cursorY = Math.round((e.clientY / window.innerHeight) * 100);
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [activeProject?.id]);
+
+  // Derive project-scoped collaborators (guarantees both owner and invited teammates are always shown)
+  const projectCollaborators = React.useMemo(() => {
+    if (!activeProject) return [];
+    const list = Array.isArray(activeProject.collaborators) ? [...activeProject.collaborators] : [];
+
     const ownerName = activeProject.ownerName || currentUser?.name || 'Owner';
     const ownerEmail = activeProject.ownerEmail || currentUser?.email || '';
+    const ownerId = activeProject.ownerId || currentUser?.id || 'usr-owner';
     const ownerAvatar =
       currentUser?.avatar ||
       `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(ownerName)}`;
 
-    return [
-      {
+    const hasOwner = list.some(
+      (c) => (ownerId && c.userId === ownerId) || (ownerEmail && c.user?.email?.toLowerCase() === ownerEmail.toLowerCase())
+    );
+
+    if (!hasOwner) {
+      list.unshift({
         id: `collab-owner-${activeProject.id}`,
         projectId: activeProject.id,
-        userId: activeProject.ownerId || currentUser?.id || 'usr-owner',
+        userId: ownerId,
         user: {
-          id: activeProject.ownerId || currentUser?.id || 'usr-owner',
+          id: ownerId,
           name: ownerName,
           email: ownerEmail,
           avatar: ownerAvatar,
@@ -85,8 +107,20 @@ export default function CollaborationPage() {
         },
         role: 'owner' as const,
         joinedAt: activeProject.createdAt,
-      },
-    ];
+      });
+    }
+
+    // Deduplicate by email or userId
+    return list.filter((c, idx, arr) => {
+      const email = c.user?.email?.toLowerCase().trim();
+      return (
+        arr.findIndex(
+          (x) =>
+            (email && x.user?.email?.toLowerCase().trim() === email) ||
+            x.userId === c.userId
+        ) === idx
+      );
+    });
   }, [activeProject, currentUser]);
 
   // Project-scoped online presence

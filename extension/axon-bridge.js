@@ -13,20 +13,7 @@
   'use strict';
 
   const PRODUCTION_SERVER_URL = 'https://bnb-gamma-red.vercel.app';
-  
-  function detectDefaultServerUrl() {
-    try {
-      if (typeof window !== 'undefined' && window.location) {
-        const origin = window.location.origin;
-        if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('ngrok'))) {
-          return origin;
-        }
-      }
-    } catch {}
-    return 'http://localhost:3000';
-  }
-
-  const DEFAULT_SERVER_URL = detectDefaultServerUrl();
+  const DEFAULT_SERVER_URL = PRODUCTION_SERVER_URL;
   const STORAGE_KEY = 'axon_auth_session';
 
   let currentAuth = {
@@ -57,9 +44,10 @@
         if (raw) currentAuth = { ...currentAuth, ...JSON.parse(raw) };
       }
 
-      // If no server URL is stored, use detected URL
-      if (!currentAuth.serverUrl) {
-        currentAuth.serverUrl = detectDefaultServerUrl();
+      // Automatically upgrade any stale localhost URLs to the deployed production link
+      if (!currentAuth.serverUrl || currentAuth.serverUrl.includes('localhost') || currentAuth.serverUrl.includes('127.0.0.1')) {
+        currentAuth.serverUrl = PRODUCTION_SERVER_URL;
+        await saveAuth();
       }
     } catch (e) {
       console.warn('[AxonBridge] Storage load warning:', e);
@@ -166,7 +154,11 @@
   // Pairing Option 1: 1-Click Web Authorization
   // ==========================================
   function startWebAuth(serverUrl) {
-    const sUrl = serverUrl || currentAuth.serverUrl || DEFAULT_SERVER_URL;
+    let sUrl = serverUrl || currentAuth.serverUrl || PRODUCTION_SERVER_URL;
+    if (!sUrl || sUrl.includes('localhost') || sUrl.includes('127.0.0.1')) {
+      sUrl = PRODUCTION_SERVER_URL;
+    }
+    sUrl = sUrl.replace(/\/+$/, '');
     const targetUrl = `${sUrl}/extension/connect?origin=extension&auto=true`;
 
     if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
@@ -345,9 +337,17 @@
   // Real Git Commit & Push Pipeline
   // ==========================================
   async function executeGitCommitPipeline(commitMessage, branch) {
-    if (!currentAuth.serverUrl) {
-      throw new Error('Please connect extension to Axon Platform first.');
-    }
+    // Collect applied CSS rules from DOM or storage
+    let customCss = '';
+    try {
+      const dmStyle = document.getElementById('dm-applied-styles');
+      if (dmStyle && dmStyle.textContent) {
+        customCss = dmStyle.textContent;
+      }
+      if (!customCss && typeof window !== 'undefined' && window.__dm && typeof window.__dm.applied === 'function') {
+        customCss = window.__dm.applied();
+      }
+    } catch {}
 
     // Collect recorded changes from local storage
     let recordedChanges = [];
@@ -369,6 +369,7 @@
       projectId: currentAuth.activeProjectId || currentAuth.projects?.[0]?.id || 'proj-live',
       commitMessage: commitMessage || 'feat(visual): style overrides applied via Axon Chrome Extension',
       branch: branch || 'main',
+      cssContent: customCss,
       files: [
         {
           filename: 'src/styles/overrides.css',
@@ -378,27 +379,47 @@
           deletions: 2,
           diffSummary: `Applied ${recordedChanges.length || 'production'} visual style overrides`,
           oldContent: '/* production base styles */',
-          newContent: '/* axon live hotfix overrides */',
+          newContent: customCss || '/* axon live hotfix overrides */',
         },
       ],
     };
 
-    const targetUrl = `${currentAuth.serverUrl}/api/extension/commit`;
-    const res = await fetch(targetUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(currentAuth.token ? { Authorization: `Bearer ${currentAuth.token}` } : {}),
-      },
-      body: JSON.stringify(payload),
-    });
+    // Resilient server URL resolution: try current server URL, then localhost:3000, then production
+    const candidateUrls = [];
+    if (currentAuth.serverUrl) candidateUrls.push(currentAuth.serverUrl);
+    if (!candidateUrls.includes('http://localhost:3000')) candidateUrls.push('http://localhost:3000');
+    if (!candidateUrls.includes(PRODUCTION_SERVER_URL)) candidateUrls.push(PRODUCTION_SERVER_URL);
 
-    const json = await res.json();
-    if (!res.ok || !json.success) {
-      throw new Error(json?.error || 'Git commit pipeline failed on Axon server.');
+    let lastError = null;
+    for (const baseUrl of candidateUrls) {
+      try {
+        const targetUrl = `${baseUrl.replace(/\/+$/, '')}/api/extension/commit`;
+        const res = await fetch(targetUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(currentAuth.token ? { Authorization: `Bearer ${currentAuth.token}` } : {}),
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const json = await res.json();
+        if (res.ok && json.success) {
+          // Success! Persist this active server URL if different
+          if (currentAuth.serverUrl !== baseUrl) {
+            currentAuth.serverUrl = baseUrl;
+            saveAuth().catch(() => {});
+          }
+          return json;
+        } else {
+          lastError = new Error(json?.error || 'Git commit pipeline rejected by Axon server.');
+        }
+      } catch (err) {
+        lastError = err;
+      }
     }
 
-    return json;
+    throw lastError || new Error('Git commit pipeline failed on Axon server.');
   }
 
   // ==========================================
@@ -943,7 +964,7 @@
                     <button type="button" id="axon-url-prod" style="font-size: 9px; padding: 1px 6px; border-radius: 4px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #CBD5E1; cursor: pointer;">Production</button>
                   </div>
                 </div>
-                <input id="axon-modal-url" type="text" value="${currentAuth.serverUrl || DEFAULT_SERVER_URL}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; padding: 6px 8px; font-size: 11px; outline: none;" />
+                <input id="axon-modal-url" type="text" value="${(currentAuth.serverUrl && !currentAuth.serverUrl.includes('localhost') && !currentAuth.serverUrl.includes('127.0.0.1')) ? currentAuth.serverUrl : PRODUCTION_SERVER_URL}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; padding: 6px 8px; font-size: 11px; outline: none;" />
               </div>
 
               <div style="margin-bottom: 12px;">
@@ -975,7 +996,8 @@
         modal.remove();
       };
       document.getElementById('axon-modal-open-dash').onclick = () => {
-        window.open(`${currentAuth.serverUrl}/dashboard`, '_blank');
+        const dashUrl = (currentAuth.serverUrl && !currentAuth.serverUrl.includes('localhost') && !currentAuth.serverUrl.includes('127.0.0.1')) ? currentAuth.serverUrl : PRODUCTION_SERVER_URL;
+        window.open(`${dashUrl}/dashboard`, '_blank');
       };
     } else {
       const pinInput = document.getElementById('axon-modal-pin');
@@ -991,16 +1013,17 @@
       if (prodBtn) prodBtn.onclick = () => { urlInput.value = PRODUCTION_SERVER_URL; };
 
       webAuthBtn.onclick = () => {
-        const sUrl = urlInput.value.trim() || DEFAULT_SERVER_URL;
-        currentAuth.serverUrl = sUrl;
+        // Authorize via AXON Web always redirects to deployed production URL
+        currentAuth.serverUrl = PRODUCTION_SERVER_URL;
         saveAuth();
+        urlInput.value = PRODUCTION_SERVER_URL;
         webAuthStatus.style.display = 'block';
-        startWebAuth(sUrl);
+        startWebAuth(PRODUCTION_SERVER_URL);
       };
 
       pairBtn.onclick = async () => {
         const pin = pinInput.value.trim();
-        const sUrl = urlInput.value.trim() || DEFAULT_SERVER_URL;
+        const sUrl = urlInput.value.trim() || PRODUCTION_SERVER_URL;
         if (!pin) {
           errorDiv.textContent = 'Please enter your 6-digit PIN or session token.';
           errorDiv.style.display = 'block';

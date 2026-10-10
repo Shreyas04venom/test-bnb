@@ -3,24 +3,64 @@
     "id": "ws-prod-1",
     "name": "Axon Production Workspace",
     "slug": "axon-prod",
-    "ownerId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+    "ownerId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
     "plan": "Enterprise",
     "membersCount": 3,
     "createdAt": "2026-09-28T13:42:47.195Z",
     "setupCompleted": true
   },
   "currentUser": {
-    "id": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
-    "name": "vivan",
-    "email": "vivanshetty45@gmail.com",
-    "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZiQmk1Mk96aTZQWXVqYWV6TTZzV25ScTQifQ",
+    "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+    "name": "Shreyas Mahajan",
+    "email": "shreyasmahajan0306@gmail.com",
+    "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
     "role": "owner",
     "cursorColor": "#6366F1",
     "timezone": "Asia/Calcutta",
-    "clerkId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
-    "githubUsername": "codevivan"
+    "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+    "githubUsername": "shreyas04venom"
   },
   "projects": [
+    {
+      "id": "proj-1791666347736",
+      "workspaceId": "ws-prod-1",
+      "name": "Curastyl PitchX VCET",
+      "slug": "curastyl-pitchx-vcet",
+      "productionUrl": "https://curastyl-vcet.vercel.app",
+      "framework": "Next.js",
+      "repositoryId": "repo-1791666347736",
+      "repositoryName": "Shreyas04venom/curastyl-pitchX-VCET",
+      "repositoryUrl": "https://github.com/Shreyas04venom/curastyl-pitchX-VCET",
+      "deploymentProvider": "vercel",
+      "deploymentProjectId": "deploy_prj_1791666347736",
+      "defaultBranch": "main",
+      "status": "production_healthy",
+      "ownershipStatus": "verified",
+      "ownerId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+      "ownerEmail": "shreyasmahajan0306@gmail.com",
+      "ownerName": "Shreyas Mahajan",
+      "collaborators": [
+        {
+          "id": "collab-1791666347736",
+          "projectId": "proj-1791666347736",
+          "userId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+          "user": {
+            "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+            "name": "Shreyas Mahajan",
+            "email": "shreyasmahajan0306@gmail.com",
+            "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
+            "role": "owner",
+            "cursorColor": "#6366F1",
+            "timezone": "UTC"
+          },
+          "role": "owner",
+          "joinedAt": "2026-10-10T21:05:47.736Z"
+        }
+      ],
+      "verifiedAt": "2026-10-10T21:05:47.736Z",
+      "createdAt": "2026-10-10T21:05:47.736Z",
+      "updatedAt": "2026-10-10T21:05:47.736Z"
+    },
     {
       "id": "proj-1790620936435",
       "workspaceId": "ws-prod-1",
@@ -264,17 +304,17 @@
     {
       "id": "mem-1",
       "workspaceId": "ws-prod-1",
-      "userId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+      "userId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
       "user": {
-        "id": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
-        "name": "vivan",
-        "email": "vivanshetty45@gmail.com",
-        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZiQmk1Mk96aTZQWXVqYWV6TTZzV25ScTQifQ",
+        "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "name": "Shreyas Mahajan",
+        "email": "shreyasmahajan0306@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
         "role": "owner",
         "cursorColor": "#6366F1",
         "timezone": "Asia/Calcutta",
-        "clerkId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
-        "githubUsername": "codevivan"
+        "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "githubUsername": "shreyas04venom"
       },
       "role": "owner",
       "joinedAt": "2026-09-28T13:42:47.234Z",
@@ -316,6 +356,60 @@
     }
   ],
   "extensionSessions": [
+    {
+      "id": "ext-sess-1791666501530",
+      "userId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+      "workspaceId": "ws-prod-1",
+      "deviceName": "Chrome Inspector Client",
+      "browser": "Chrome 129",
+      "tokenHash": "hash_axon_ext_tok_179...",
+      "permissions": [
+        "read:projects",
+        "write:patches",
+        "read:collaborators",
+        "realtime:presence",
+        "audit:events"
+      ],
+      "createdAt": "2026-10-10T21:08:21.530Z",
+      "lastActiveAt": "Just now",
+      "expiresAt": "2026-11-09T21:08:21.530Z"
+    },
+    {
+      "id": "ext-sess-1791666312153",
+      "userId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+      "workspaceId": "ws-prod-1",
+      "deviceName": "Chrome Inspector Client",
+      "browser": "Chrome 129",
+      "tokenHash": "hash_axon_ext_tok_179...",
+      "permissions": [
+        "read:projects",
+        "write:patches",
+        "read:collaborators",
+        "realtime:presence",
+        "audit:events"
+      ],
+      "createdAt": "2026-10-10T21:05:12.153Z",
+      "lastActiveAt": "Just now",
+      "expiresAt": "2026-11-09T21:05:12.153Z"
+    },
+    {
+      "id": "ext-sess-1791666199654",
+      "userId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+      "workspaceId": "ws-prod-1",
+      "deviceName": "Chrome Inspector Client",
+      "browser": "Chrome 129",
+      "tokenHash": "hash_axon_ext_tok_179...",
+      "permissions": [
+        "read:projects",
+        "write:patches",
+        "read:collaborators",
+        "realtime:presence",
+        "audit:events"
+      ],
+      "createdAt": "2026-10-10T21:03:19.654Z",
+      "lastActiveAt": "Just now",
+      "expiresAt": "2026-11-09T21:03:19.654Z"
+    },
     {
       "id": "ext-sess-1791665837308",
       "userId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
@@ -397,6 +491,126 @@
   ],
   "verifications": [],
   "auditLogs": [
+    {
+      "id": "aud-1791666501530-o51m",
+      "action": "EXTENSION_PAIRED",
+      "user": {
+        "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "name": "Shreyas Mahajan",
+        "email": "shreyasmahajan0306@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "githubUsername": "shreyas04venom"
+      },
+      "timestamp": "2026-10-10T21:08:21.530Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+      "result": "success",
+      "metadata": {
+        "device": "Chrome Inspector Client",
+        "browser": "Chrome 129"
+      }
+    },
+    {
+      "id": "aud-1791666475259-kvh4",
+      "action": "INVITATION_SENT",
+      "user": {
+        "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "name": "Shreyas Mahajan",
+        "email": "shreyasmahajan0306@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "githubUsername": "shreyas04venom"
+      },
+      "timestamp": "2026-10-10T21:07:55.259Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+      "result": "success",
+      "metadata": {
+        "inviteCode": "st3fdusb",
+        "role": "developer"
+      },
+      "projectId": "proj-1791666347736",
+      "projectName": "Curastyl PitchX VCET"
+    },
+    {
+      "id": "aud-1791666347737-62mt",
+      "action": "PROJECT_CREATED",
+      "user": {
+        "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "name": "Shreyas Mahajan",
+        "email": "shreyasmahajan0306@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "githubUsername": "shreyas04venom"
+      },
+      "timestamp": "2026-10-10T21:05:47.737Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+      "result": "success",
+      "metadata": {
+        "repo": "Shreyas04venom/curastyl-pitchX-VCET",
+        "url": "https://curastyl-vcet.vercel.app",
+        "ownerEmail": "shreyasmahajan0306@gmail.com"
+      },
+      "projectId": "proj-1791666347736",
+      "projectName": "Curastyl PitchX VCET"
+    },
+    {
+      "id": "aud-1791666312153-sv7g",
+      "action": "EXTENSION_PAIRED",
+      "user": {
+        "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "name": "Shreyas Mahajan",
+        "email": "shreyasmahajan0306@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "githubUsername": "shreyas04venom"
+      },
+      "timestamp": "2026-10-10T21:05:12.153Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+      "result": "success",
+      "metadata": {
+        "device": "Chrome Inspector Client",
+        "browser": "Chrome 129"
+      }
+    },
+    {
+      "id": "aud-1791666199654-vz17",
+      "action": "EXTENSION_PAIRED",
+      "user": {
+        "id": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "name": "vivan",
+        "email": "vivanshetty45@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZiQmk1Mk96aTZQWXVqYWV6TTZzV25ScTQifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVbBiBdrKqjmVtkkIHruAbEJ8G",
+        "githubUsername": "codevivan"
+      },
+      "timestamp": "2026-10-10T21:03:19.654Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+      "result": "success",
+      "metadata": {
+        "device": "Chrome Inspector Client",
+        "browser": "Chrome 129"
+      }
+    },
     {
       "id": "aud-1791665837308-dxhl",
       "action": "EXTENSION_PAIRED",
@@ -643,6 +857,18 @@
     }
   ],
   "invites": [
+    {
+      "id": "inv-1791666475255-i6nc",
+      "code": "st3fdusb",
+      "projectId": "proj-1791666347736",
+      "projectName": "Curastyl PitchX VCET",
+      "inviterId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+      "inviterName": "Shreyas Mahajan",
+      "inviterEmail": "shreyasmahajan0306@gmail.com",
+      "role": "developer",
+      "status": "pending",
+      "createdAt": "2026-10-10T21:07:55.255Z"
+    },
     {
       "id": "inv-1791665837271-n8nz",
       "code": "mdi8w1r8",

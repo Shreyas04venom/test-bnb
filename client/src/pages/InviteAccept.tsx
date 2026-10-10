@@ -92,10 +92,16 @@ export default function InviteAcceptPage() {
     fetchInvite();
   }, [inviteCode]);
 
-  const handleAccept = async () => {
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+
+  const handleAccept = async (overrideUser?: { name?: string; email?: string }) => {
     if (!inviteCode) return;
     setIsProcessing(true);
     try {
+      const gName = overrideUser?.name?.trim() || guestName.trim();
+      const gEmail = overrideUser?.email?.trim() || guestEmail.trim();
+
       const activeUser = clerkUser
         ? {
             id: clerkUser.id,
@@ -110,6 +116,13 @@ export default function InviteAcceptPage() {
               '',
             avatar: clerkUser.imageUrl,
           }
+        : gName || gEmail
+        ? {
+            id: `usr-${Date.now()}`,
+            name: gName || (gEmail ? gEmail.split('@')[0] : 'Teammate'),
+            email: gEmail || 'friend@axon.dev',
+            avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(gName || 'Teammate')}`,
+          }
         : currentUser
         ? {
             id: currentUser.id,
@@ -117,17 +130,22 @@ export default function InviteAcceptPage() {
             email: currentUser.email,
             avatar: currentUser.avatar,
           }
-        : undefined;
+        : {
+            id: `usr-${Date.now()}`,
+            name: 'Teammate',
+            email: 'teammate@axon.dev',
+            avatar: `https://api.dicebear.com/7.x/initials/svg?seed=Teammate`,
+          };
 
       const res = await acceptProjectInvite(inviteCode, activeUser);
       if (res.success) {
         setStatusState('accepted');
         toast.success(`Welcome to ${project?.name || 'the project'}!`, {
-          description: 'You are now an authorized collaborator.',
+          description: 'You are now an authorized collaborator. Opening Multiplayer Space...',
         });
         setTimeout(() => {
-          setLocation('/dashboard');
-        }, 1500);
+          setLocation('/collaboration');
+        }, 1200);
       } else {
         toast.error('Could not accept invitation', {
           description: res.error || 'Please try again.',
@@ -325,37 +343,79 @@ export default function InviteAcceptPage() {
 
               {/* Auth Context & Actions */}
               {isLoaded && !isSignedIn ? (
-                /* Unauthenticated View -> Prompt Login / Sign Up */
-                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 space-y-3">
-                  <div className="flex items-center gap-2 text-amber-900 text-xs font-semibold">
-                    <Shield className="w-4 h-4 text-amber-600" />
-                    Authentication Required
+                /* Unauthenticated View -> Instant Join Option + Clerk Sign In Option */
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 space-y-3">
+                    <div className="flex items-center gap-2 text-indigo-950 text-xs font-bold">
+                      <Sparkles className="w-4 h-4 text-indigo-600" />
+                      Instant Join as Team Collaborator
+                    </div>
+                    <p className="text-xs text-indigo-800">
+                      Enter your name to join <strong>{project?.name}</strong> immediately, or sign in below with your existing account.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      <input
+                        type="text"
+                        placeholder="Your Name (e.g. Alex, Sam)"
+                        value={guestName}
+                        onChange={(e) => setGuestName(e.target.value)}
+                        className="px-3 py-2 rounded-xl bg-white border border-indigo-200 text-xs text-[#1B133C] focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                      />
+                      <input
+                        type="email"
+                        placeholder="Your Email (optional)"
+                        value={guestEmail}
+                        onChange={(e) => setGuestEmail(e.target.value)}
+                        className="px-3 py-2 rounded-xl bg-white border border-indigo-200 text-xs text-[#1B133C] focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isProcessing}
+                      onClick={() => handleAccept()}
+                      className="w-full mt-2 inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Joining Project...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Join Project Directly (1-Click)</span>
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <p className="text-xs text-amber-800">
-                    Please sign in or create your account to accept this project invitation. Your
-                    permissions will be linked automatically.
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <button
-                      onClick={() =>
-                        setLocation(
-                          `/login?redirect_url=${encodeURIComponent(`/invite/${inviteCode}`)}`
-                        )
-                      }
-                      className="w-full py-2.5 rounded-xl bg-[#1B133C] text-white text-xs font-semibold hover:bg-black transition-colors"
-                    >
-                      Sign In
-                    </button>
-                    <button
-                      onClick={() =>
-                        setLocation(
-                          `/signup?redirect_url=${encodeURIComponent(`/invite/${inviteCode}`)}`
-                        )
-                      }
-                      className="w-full py-2.5 rounded-xl bg-white border border-amber-300 text-amber-900 text-xs font-semibold hover:bg-amber-100/50 transition-colors"
-                    >
-                      Create Account
-                    </button>
+
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-black/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Shield className="w-4 h-4 text-slate-500" />
+                      <span>Have an Axon / Clerk account?</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() =>
+                          setLocation(
+                            `/login?redirect_url=${encodeURIComponent(`/invite/${inviteCode}`)}`
+                          )
+                        }
+                        className="px-3 py-1.5 rounded-lg border border-black/10 bg-white text-xs font-semibold text-[#1B133C] hover:bg-black/5 transition-colors"
+                      >
+                        Sign In
+                      </button>
+                      <button
+                        onClick={() =>
+                          setLocation(
+                            `/signup?redirect_url=${encodeURIComponent(`/invite/${inviteCode}`)}`
+                          )
+                        }
+                        className="px-3 py-1.5 rounded-lg bg-[#1B133C] text-white text-xs font-semibold hover:bg-black transition-colors"
+                      >
+                        Create Account
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
