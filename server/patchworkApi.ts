@@ -563,6 +563,7 @@ patchworkApiRouter.post('/projects/:id/invites', (req: Request, res: Response) =
     // create a placeholder project record so the invite link works smoothly
     project = {
       id: targetId,
+      workspaceId: store.workspace.id,
       name: projectName || 'Axon Project',
       slug: targetId,
       productionUrl: '',
@@ -573,9 +574,10 @@ patchworkApiRouter.post('/projects/:id/invites', (req: Request, res: Response) =
       deploymentProvider: 'vercel',
       deploymentProjectId: `deploy-${Date.now()}`,
       defaultBranch: 'main',
+      status: 'production_healthy',
+      ownershipStatus: 'verified',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      environments: ['production', 'preview', 'development'],
       ownerId: inviterId || store.currentUser.id,
       ownerName: inviterName || store.currentUser.name,
       ownerEmail: inviterEmail || store.currentUser.email,
@@ -654,6 +656,7 @@ patchworkApiRouter.get('/invites/:code', (req: Request, res: Response) => {
   if (!project) {
     project = {
       id: invite.projectId,
+      workspaceId: store.workspace.id,
       name: invite.projectName || 'Axon Project',
       slug: invite.projectId,
       productionUrl: '',
@@ -664,9 +667,10 @@ patchworkApiRouter.get('/invites/:code', (req: Request, res: Response) => {
       deploymentProvider: 'vercel',
       deploymentProjectId: `deploy-${Date.now()}`,
       defaultBranch: 'main',
+      status: 'production_healthy',
+      ownershipStatus: 'verified',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      environments: ['production', 'preview', 'development'],
       ownerId: invite.inviterId,
       ownerName: invite.inviterName,
       ownerEmail: invite.inviterEmail,
@@ -825,6 +829,7 @@ patchworkApiRouter.post('/invites/:code/accept', (req: Request, res: Response) =
     route: '/collaboration',
     cursorX: 50,
     cursorY: 50,
+    selectedElement: '',
   });
 
   pushAudit('COLLABORATOR_INVITED', {

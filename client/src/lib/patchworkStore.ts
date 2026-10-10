@@ -18,7 +18,8 @@ import type {
   IntegrationsConfig,
   NotificationItem,
   PatchStatus,
-  RiskLevel
+  RiskLevel,
+  ProjectInvite,
 } from '../../../shared/patchwork-types';
 
 export const INITIAL_USER: User = {
@@ -112,6 +113,7 @@ export interface PatchworkStoreState {
   notifications: NotificationItem[];
   pairingCode: string | null;
   pairingExpiresAt: number | null;
+  invites: ProjectInvite[];
   isLoading: boolean;
 
   // Sync with Server API
@@ -195,6 +197,7 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
       presence: [],
       auditLogs: [],
       extensionSessions: [],
+      invites: [],
       integrations: {
         github: {
           connected: false,
@@ -288,6 +291,7 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
                 deployments: d.deployments || [],
                 auditLogs: d.auditLogs || [],
                 conflicts: d.conflicts || [],
+                invites: d.invites || [],
                 versions: d.versions || get().versions,
                 verificationRun: Array.isArray(d.verifications) && d.verifications.length > 0 ? d.verifications[0] : get().verificationRun,
                 integrations: {
