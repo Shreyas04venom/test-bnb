@@ -55,22 +55,6 @@
           },
           "role": "owner",
           "joinedAt": "2026-10-10T21:05:47.736Z"
-        },
-        {
-          "id": "collab-1791669209679",
-          "projectId": "proj-1791666347736",
-          "userId": "usr-friend-99",
-          "user": {
-            "id": "usr-friend-99",
-            "name": "Rahul Sharma",
-            "email": "friend.testing@gmail.com",
-            "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=Rahul%20Sharma",
-            "role": "developer",
-            "cursorColor": "#EC4899",
-            "timezone": "UTC"
-          },
-          "role": "developer",
-          "joinedAt": "2026-10-10T21:53:29.679Z"
         }
       ],
       "verifiedAt": "2026-10-10T21:05:47.736Z",

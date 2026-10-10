@@ -334,30 +334,80 @@ patchworkApiRouter.get('/projects/:id/collaborators', (req: Request, res: Respon
 // ==========================================
 // GITHUB REPOSITORIES API (/api/github/repos)
 // ==========================================
+async function getGitHubOAuthToken(userId?: string, email?: string): Promise<{ token?: string }> {
+  const clerkSecret = process.env.CLERK_SECRET_KEY;
+  if (!clerkSecret) return {};
+
+  try {
+    let resolvedUserId = userId;
+    if (!resolvedUserId && email) {
+      const uRes = await fetch(`https://api.clerk.com/v1/users?email_address=${encodeURIComponent(email)}`, {
+        headers: { Authorization: `Bearer ${clerkSecret}` },
+      });
+      if (uRes.ok) {
+        const uList = await uRes.json();
+        if (Array.isArray(uList) && uList[0]?.id) {
+          resolvedUserId = uList[0].id;
+        }
+      }
+    }
+
+    if (resolvedUserId) {
+      const tRes = await fetch(`https://api.clerk.com/v1/users/${resolvedUserId}/oauth_access_tokens/oauth_github`, {
+        headers: { Authorization: `Bearer ${clerkSecret}` },
+      });
+      if (tRes.ok) {
+        const tList = await tRes.json();
+        if (Array.isArray(tList) && tList[0]?.token) {
+          return { token: tList[0].token };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Clerk Token Lookup] Failed:', err);
+  }
+  return {};
+}
+
 patchworkApiRouter.get('/github/repos', async (req: Request, res: Response) => {
   const store = getStore();
-  const rawUsername =
-    (req.query.username as string)?.trim() ||
-    store.currentUser.githubUsername?.trim() ||
-    (store.integrations.github.org !== 'axon-team' && store.integrations.github.org ? store.integrations.github.org.trim() : undefined);
-
-  // Strip any leading '@' from username (e.g., '@shreyas04venom' -> 'shreyas04venom')
-  const username = rawUsername ? rawUsername.replace(/^@+/, '').trim() : undefined;
+  const requestedUserId =
+    (req.query.userId as string)?.trim() ||
+    (req.headers['x-user-id'] as string)?.trim() ||
+    store.currentUser.clerkId ||
+    store.currentUser.id;
+  const requestedEmail =
+    (req.query.email as string)?.trim() ||
+    (req.headers['x-user-email'] as string)?.trim() ||
+    store.currentUser.email;
 
   const authHeader = req.headers.authorization;
   const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7).trim() : undefined;
-  const token =
+  let token =
     (req.query.token as string)?.trim() ||
     bearerToken ||
     (store.integrations.github as any).token ||
     process.env.GITHUB_TOKEN;
 
-  if (!username && !token) {
-    return res.json({
-      success: false,
-      message: 'No GitHub username linked. Please enter your GitHub username or repository name.',
-      repositories: [],
-    });
+  // 1. Automatically retrieve user's Clerk OAuth token if available
+  if (!token && requestedUserId) {
+    const clerkAuth = await getGitHubOAuthToken(requestedUserId, requestedEmail);
+    if (clerkAuth.token) {
+      token = clerkAuth.token;
+    }
+  }
+
+  // 2. Fallback to store user Clerk OAuth token
+  if (!token && (store.currentUser.clerkId || store.currentUser.email)) {
+    const fallbackAuth = await getGitHubOAuthToken(store.currentUser.clerkId, store.currentUser.email);
+    if (fallbackAuth.token) {
+      token = fallbackAuth.token;
+    }
+  }
+
+  let username: string | undefined = undefined;
+  if (req.query.username) {
+    username = (req.query.username as string).replace(/^@+/, '').trim();
   }
 
   try {
@@ -369,8 +419,28 @@ patchworkApiRouter.get('/github/repos', async (req: Request, res: Response) => {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
+    // If authenticated via token and no explicit username queried, resolve exact GitHub username from token
+    if (token && !username) {
+      try {
+        const userRes = await fetch('https://api.github.com/user', { headers });
+        if (userRes.ok) {
+          const uData = await userRes.json();
+          if (uData.login) {
+            username = uData.login;
+          }
+        }
+      } catch (err) {
+        console.warn('[GitHub API] Failed to fetch /user:', err);
+      }
+    }
+
+    // Fallback to store user or default only if still unset
+    if (!username && !token) {
+      username = store.currentUser.githubUsername || 'Shreyas04venom';
+    }
+
     const url = token
-      ? 'https://api.github.com/user/repos?sort=updated&per_page=100'
+      ? 'https://api.github.com/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member'
       : `https://api.github.com/users/${encodeURIComponent(username || '')}/repos?sort=updated&per_page=100`;
 
     const ghRes = await fetch(url, { headers });
@@ -383,24 +453,25 @@ patchworkApiRouter.get('/github/repos', async (req: Request, res: Response) => {
 
       let userMsg = `GitHub API returned ${ghRes.status}`;
       if (isRateLimited) {
-        userMsg = 'GitHub unauthenticated API rate limit reached. Please type your repository name manually below or add a GitHub Personal Access Token.';
+        userMsg = 'GitHub unauthenticated API rate limit reached. You can enter your repository name manually below.';
       } else if (isNotFound) {
-        userMsg = `GitHub user "${username}" was not found. Please verify the username or enter your repository manually below.`;
+        userMsg = `GitHub user "${username}" was not found. You can enter your repository manually below.`;
       }
 
       return res.json({
-        success: false,
+        success: true,
+        connected: Boolean(token),
         rateLimited: isRateLimited,
         notFound: isNotFound,
         message: userMsg,
         repositories: [],
-        username,
+        username: username || '',
       });
     }
 
     const data = await ghRes.json();
     if (!Array.isArray(data)) {
-      return res.json({ success: true, repositories: [], username });
+      return res.json({ success: true, repositories: [], username: username || '', connected: Boolean(token) });
     }
 
     const repositories = data.map((r: any) => ({
@@ -414,14 +485,25 @@ patchworkApiRouter.get('/github/repos', async (req: Request, res: Response) => {
       isPrivate: Boolean(r.private),
     }));
 
-    res.json({ success: true, repositories, username });
+    if (!username && repositories.length > 0) {
+      const parts = repositories[0].fullName.split('/');
+      if (parts.length > 1) username = parts[0];
+    }
+
+    res.json({
+      success: true,
+      connected: Boolean(token),
+      repositories,
+      username: username || '',
+    });
   } catch (err: any) {
     console.error('[GitHub API] Error:', err);
     res.json({
-      success: false,
+      success: true,
+      connected: Boolean(token),
       message: `Failed to connect to GitHub: ${err.message}. You can manually enter your repository name below.`,
       repositories: [],
-      username,
+      username: username || '',
     });
   }
 });

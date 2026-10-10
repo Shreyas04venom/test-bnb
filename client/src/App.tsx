@@ -94,6 +94,9 @@ function ClerkUserSync() {
         currentUser.githubUsername !== githubUsername;
 
       if (needsUpdate) {
+        if (githubUsername && typeof window !== "undefined") {
+          localStorage.setItem("axon_github_username", githubUsername);
+        }
         switchUser({
           id: user.id,
           clerkId: user.id,
@@ -107,6 +110,19 @@ function ClerkUserSync() {
           isEmailVerified,
           connectedProviders,
         });
+        // Persist profile to server so backend has active user credentials and githubUsername
+        fetch("/api/user", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: user.id,
+            clerkId: user.id,
+            name,
+            email,
+            avatar,
+            githubUsername,
+          }),
+        }).catch(() => {});
         // Immediately fetch user-scoped projects
         fetchInitialState(user.id, email);
       }
