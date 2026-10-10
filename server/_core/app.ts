@@ -73,3 +73,4 @@ export function createServerApp() {
 }
 
 export const app = createServerApp();
+export default app;
