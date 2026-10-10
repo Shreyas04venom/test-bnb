@@ -75611,9 +75611,11 @@ function createServerApp() {
   return app2;
 }
 var app = createServerApp();
+var app_default = app;
 export {
   app,
-  createServerApp
+  createServerApp,
+  app_default as default
 };
 /*! Bundled license information:
 
