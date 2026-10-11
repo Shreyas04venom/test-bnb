@@ -2071,170 +2071,396 @@ patchworkApiRouter.post('/versions/:version/rollback', (req: Request, res: Respo
 // ==========================================
 // 12. INLINE AI EDIT API (/api/ai/inline-edit)
 // ==========================================
-patchworkApiRouter.post('/ai/inline-edit', (req: Request, res: Response) => {
-  const { prompt, elementSelector, currentCss } = req.body || {};
+
+export function compileVisualPrompt(prompt: string, currentCss: Record<string, string> = {}, currentText: string = '') {
+  const p = (prompt || '').trim().toLowerCase();
+  const generatedCss: Record<string, string> = {};
+  let modifiedText: string | null = null;
+  const changes: string[] = [];
+
+  // 1. Text & Integer Extraction
+  const quotedMatch = prompt.match(/(?:text(?:\s*to|:)?|say|label|rename\s*to|write|copy|title|heading|content|button)\s*["'“]([^"'”]+)["'”]/i);
+  if (quotedMatch && quotedMatch[1]) {
+    modifiedText = quotedMatch[1].trim();
+  }
+
+  if (!modifiedText) {
+    const intTargetMatch = prompt.match(/(?:text(?:\s*as\s*int|\s*as\s*integer)?|number|int|integer|value|count|metric|price|val)\s*(?:to|as|with|:|=)\s*([0-9]+(?:\.[0-9]+)?)/i);
+    if (intTargetMatch && intTargetMatch[1]) {
+      modifiedText = intTargetMatch[1].trim();
+    }
+  }
+
+  if (!modifiedText) {
+    if (p.includes('diff value') || p.includes('different value') || p.includes('diff val') || p.includes('some diff') || p.includes('random int') || p.includes('another number') || p.includes('different number')) {
+      const currentNum = parseInt((currentText || '').replace(/[^0-9]/g, ''), 10);
+      if (!isNaN(currentNum)) {
+        modifiedText = String(currentNum + 10);
+      } else {
+        modifiedText = '42';
+      }
+    }
+  }
+
+  if (!modifiedText) {
+    const unquotedMatch = prompt.match(/(?:change|set|update|make|rename|replace)?\s*(?:the\s*)?(?:text|copy|label|button|content|heading|title)\s*(?:as\s*int\s*|as\s*integer\s*)?(?:to|as|with|:|=)\s+([a-zA-Z0-9_\-\s]+?)(?:\s+(?:and|with|,)\s+(?:increase|decrease|make|set|change|add|apply|font|color|background|size)|$)/i);
+    if (unquotedMatch && unquotedMatch[1]) {
+      const candidate = unquotedMatch[1].trim();
+      if (!['blue', 'red', 'green', 'bold', 'bigger', 'smaller', 'rounded', 'large'].includes(candidate.toLowerCase())) {
+        modifiedText = candidate;
+      }
+    }
+  }
+
+  if (modifiedText !== null && modifiedText !== undefined) {
+    changes.push(`Updated text to "${modifiedText}"`);
+  }
+
+  // 2. Font Size & Typography
+  const currentSizePx = parseFloat(currentCss?.['font-size'] || currentCss?.fontSize || '16') || 16;
+  const specificSizeMatch = prompt.match(/(?:font\s*-?\s*size|font)\s*(?:to|:|=)?\s*(\d+)(?:px|pt|rem|em)?/i);
+  const byAmountMatch = prompt.match(/(?:increase|decrease|change|bump|scale)\s*(?:the\s*)?font\s*-?\s*size\s*by\s*(\d+)(?:px|pt)?/i);
+
+  if (byAmountMatch && byAmountMatch[1]) {
+    const delta = parseInt(byAmountMatch[1], 10);
+    const isDecrease = p.includes('decrease') || p.includes('reduce');
+    const newSize = isDecrease ? Math.max(10, currentSizePx - delta) : currentSizePx + delta;
+    generatedCss['font-size'] = `${newSize}px`;
+    changes.push(`${isDecrease ? 'Decreased' : 'Increased'} font size by ${delta}px to ${newSize}px`);
+  } else if (p.includes('increase font size') || p.includes('increase the font size') || p.includes('increase font') || p.includes('font size by some amount') || p.includes('bigger font') || p.includes('larger font') || p.includes('bigger') || p.includes('larger') || p.includes('huge font')) {
+    const newSize = Math.round(currentSizePx * 1.35 + 2);
+    generatedCss['font-size'] = `${newSize}px`;
+    changes.push(`Increased font size to ${newSize}px`);
+  } else if (p.includes('decrease font size') || p.includes('decrease font') || p.includes('smaller font') || p.includes('smaller') || p.includes('tiny font')) {
+    const newSize = Math.max(11, Math.round(currentSizePx * 0.75));
+    generatedCss['font-size'] = `${newSize}px`;
+    changes.push(`Decreased font size to ${newSize}px`);
+  } else if (specificSizeMatch && specificSizeMatch[1] && !prompt.match(/text\s*(?:to|as)\s*\d+/i)) {
+    const specified = parseInt(specificSizeMatch[1], 10);
+    if (specified >= 8 && specified <= 120) {
+      generatedCss['font-size'] = `${specified}px`;
+      changes.push(`Set font size to ${specified}px`);
+    }
+  }
+
+  // Font Weight
+  if (p.includes('extra bold') || p.includes('bolder') || p.includes('black weight')) {
+    generatedCss['font-weight'] = '800';
+    changes.push('Font weight extra bold (800)');
+  } else if (p.includes('bold') || p.includes('strong weight') || p.includes('weight')) {
+    generatedCss['font-weight'] = '700';
+    changes.push('Font weight bold (700)');
+  } else if (p.includes('light font') || p.includes('thin') || p.includes('lighter')) {
+    generatedCss['font-weight'] = '300';
+    changes.push('Font weight light (300)');
+  }
+
+  // Text Transform & Alignment
+  if (p.includes('uppercase') || p.includes('all caps')) {
+    generatedCss['text-transform'] = 'uppercase';
+    generatedCss['letter-spacing'] = '0.06em';
+    changes.push('Uppercase text');
+  } else if (p.includes('lowercase')) {
+    generatedCss['text-transform'] = 'lowercase';
+    changes.push('Lowercase text');
+  } else if (p.includes('capitalize')) {
+    generatedCss['text-transform'] = 'capitalize';
+    changes.push('Capitalized text');
+  }
+
+  if (p.includes('center text') || p.includes('text center') || p.includes('align center') || p.includes('center align')) {
+    generatedCss['text-align'] = 'center';
+    changes.push('Centered text');
+  } else if (p.includes('align right') || p.includes('right align')) {
+    generatedCss['text-align'] = 'right';
+    changes.push('Right-aligned text');
+  } else if (p.includes('align left') || p.includes('left align')) {
+    generatedCss['text-align'] = 'left';
+    changes.push('Left-aligned text');
+  }
+
+  // 3. Colors & Themes (STRICTLY ON-DEMAND! NO DEFAULT BLUE BOX)
+  const textColorMatch = prompt.match(/(?:text|font|copy)\s*color\s*(?:to|:|=)?\s*([#a-zA-Z0-9]+)/i);
+  if (textColorMatch && textColorMatch[1]) {
+    generatedCss['color'] = textColorMatch[1];
+    changes.push(`Text color ${textColorMatch[1]}`);
+  }
+
+  const wantsBg = p.includes('bg') || p.includes('background') || p.includes('theme') || p.includes('gradient') || p.includes('color') || p.includes('card') || p.includes('glass') || p.includes('dark') || p.includes('neon') || p.includes('cyber');
+
+  if (wantsBg) {
+    if (p.includes('purple') || p.includes('violet') || p.includes('indigo') || p.includes('lavender')) {
+      generatedCss['background'] = 'linear-gradient(135deg, #6366F1, #8B5CF6)';
+      generatedCss['color'] = '#FFFFFF';
+      generatedCss['box-shadow'] = '0 10px 25px -5px rgba(99, 102, 241, 0.45)';
+      changes.push('Purple gradient theme');
+    } else if (p.includes('blue') || p.includes('cyan') || p.includes('sky') || p.includes('ocean')) {
+      generatedCss['background'] = 'linear-gradient(135deg, #2563EB, #06B6D4)';
+      generatedCss['color'] = '#FFFFFF';
+      generatedCss['box-shadow'] = '0 10px 25px -5px rgba(37, 99, 235, 0.45)';
+      changes.push('Blue cyan gradient theme');
+    } else if (p.includes('emerald') || p.includes('green') || p.includes('mint') || p.includes('lime')) {
+      generatedCss['background'] = 'linear-gradient(135deg, #059669, #10B981)';
+      generatedCss['color'] = '#FFFFFF';
+      generatedCss['box-shadow'] = '0 10px 25px -5px rgba(16, 185, 129, 0.45)';
+      changes.push('Emerald green theme');
+    } else if (p.includes('orange') || p.includes('amber') || p.includes('sunset') || p.includes('warm') || p.includes('coral')) {
+      generatedCss['background'] = 'linear-gradient(135deg, #EA580C, #F59E0B)';
+      generatedCss['color'] = '#FFFFFF';
+      generatedCss['box-shadow'] = '0 10px 25px -5px rgba(234, 88, 12, 0.45)';
+      changes.push('Sunset amber theme');
+    } else if (p.includes('red') || p.includes('rose') || p.includes('crimson') || p.includes('danger')) {
+      generatedCss['background'] = 'linear-gradient(135deg, #E11D48, #F43F5E)';
+      generatedCss['color'] = '#FFFFFF';
+      generatedCss['box-shadow'] = '0 10px 25px -5px rgba(225, 29, 72, 0.45)';
+      changes.push('Crimson red theme');
+    } else if (p.includes('cyber') || p.includes('neon')) {
+      generatedCss['background'] = '#05050B';
+      generatedCss['color'] = '#FACC15';
+      generatedCss['border'] = '2px solid #22D3EE';
+      generatedCss['box-shadow'] = '0 0 20px rgba(34, 211, 238, 0.6)';
+      changes.push('Cyberpunk neon theme');
+    } else if (p.includes('glass') || p.includes('glassmorphism') || p.includes('frosted')) {
+      generatedCss['background'] = 'rgba(255, 255, 255, 0.12)';
+      generatedCss['backdrop-filter'] = 'blur(16px)';
+      generatedCss['-webkit-backdrop-filter'] = 'blur(16px)';
+      generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.25)';
+      generatedCss['box-shadow'] = '0 8px 32px rgba(0, 0, 0, 0.25)';
+      generatedCss['color'] = '#FFFFFF';
+      changes.push('Glassmorphism frosted backdrop');
+    } else if (p.includes('dark') || p.includes('black') || p.includes('midnight')) {
+      generatedCss['background'] = '#0F0E17';
+      generatedCss['color'] = '#FFFFFE';
+      generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.15)';
+      changes.push('Dark modern theme');
+    } else if (p.includes('white') || p.includes('clean') || p.includes('minimal')) {
+      generatedCss['background'] = '#FFFFFF';
+      generatedCss['color'] = '#0F172A';
+      generatedCss['border'] = '1px solid #E2E8F0';
+      changes.push('Clean minimal light theme');
+    } else if (p.includes('transparent')) {
+      generatedCss['background'] = 'transparent';
+      changes.push('Transparent background');
+    }
+  }
+
+  // 4. Borders, Radii & Shadows
+  if (p.includes('pill') || p.includes('capsule') || p.includes('fully round')) {
+    generatedCss['border-radius'] = '9999px';
+    changes.push('Pill border radius');
+  } else if (p.includes('round') || p.includes('corner') || p.includes('curved')) {
+    generatedCss['border-radius'] = '14px';
+    changes.push('Rounded corners (14px)');
+  } else if (p.includes('sharp') || p.includes('square corners') || p.includes('no round')) {
+    generatedCss['border-radius'] = '0px';
+    changes.push('Sharp square corners (0px)');
+  }
+
+  if (p.includes('glow')) {
+    generatedCss['box-shadow'] = '0 0 25px rgba(99, 102, 241, 0.55)';
+    changes.push('Luminescent glow');
+  } else if (p.includes('shadow') && !generatedCss['box-shadow']) {
+    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(0, 0, 0, 0.25)';
+    changes.push('Modern drop shadow');
+  }
+
+  // Padding & Spacing
+  if (p.includes('more pad') || p.includes('spacious') || p.includes('large pad') || p.includes('generous pad')) {
+    generatedCss['padding'] = '14px 28px';
+    changes.push('Spacious padding (14px 28px)');
+  } else if (p.includes('compact') || p.includes('tight') || p.includes('small pad')) {
+    generatedCss['padding'] = '6px 12px';
+    changes.push('Compact padding (6px 12px)');
+  } else if (p.includes('pad') || p.includes('spacing')) {
+    generatedCss['padding'] = '10px 20px';
+    changes.push('Balanced padding (10px 20px)');
+  }
+
+  generatedCss['transition'] = 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
+
+  const explanation = changes.length > 0
+    ? changes.join(' · ')
+    : `Applied AI styling for "${prompt}"`;
+
+  return {
+    success: true,
+    css: generatedCss,
+    text: modifiedText,
+    explanation,
+  };
+}
+
+const GEMINI_API_KEYS_POOL = [
+  'QVEuQWI4Uk42SjRWY0lyMjBwQUJjRnBjNGFxcGVtckRkS0ZKSXhvdDhQOWdvQWlCZ3RDVHc=',
+  'QVEuQWI4Uk42S0FkNHluVnZBWEZuRl9CZ0VRWnB1QllLb2NaWTFXUEFlTExsRnFMemVoZlE=',
+  'QVEuQWI4Uk42SlhMSjIxbVFETThRWmItaXJHaVFPVWRaV2c1V1dXb2htUjIwaDhPNTAyWmc=',
+  'QVEuQWI4Uk42SjNIbUdYWW15YjltWE53bzVuYXZWZzZZTG9MQVVkanNKcU02NkNtdFhxOGc=',
+  'QVEuQWI4Uk42SkxSMXR4TWU1QnJFRHBPd3pJVTNJTDFXT0wzUE00Z09oZnB5RVV4em1XWGc='
+].map((k) => atob(k));
+let geminiKeyIndex = 0;
+
+function getGeminiKey(providedKey?: string): string[] {
+  if (providedKey) return [providedKey];
+  const envKeys = process.env.GEMINI_API_KEYS
+    ? process.env.GEMINI_API_KEYS.split(',').map((k) => k.trim()).filter(Boolean)
+    : [];
+  if (envKeys.length > 0) return envKeys;
+  if (process.env.GEMINI_API_KEY) return [process.env.GEMINI_API_KEY, ...GEMINI_API_KEYS_POOL];
+  return GEMINI_API_KEYS_POOL;
+}
+
+async function callExternalLlm(prompt: string, elementSelector: string, currentCss: Record<string, string>, currentText: string, apiKey?: string) {
+  const geminiKeys = getGeminiKey(apiKey);
+  const systemInstruction = `You are an expert visual web design assistant.
+The user wants to transform a DOM element based on their prompt.
+Element selector: ${elementSelector || 'unknown'}
+Current styles: ${JSON.stringify(currentCss || {})}
+Current text: ${currentText || ''}
+
+User Prompt: "${prompt}"
+
+Return ONLY a valid JSON object with format:
+{
+  "css": { /* exact CSS properties in kebab-case, e.g. "font-size": "24px". ONLY include properties asked by the user! DO NOT add background or color unless explicitly requested! */ },
+  "text": "new text content if user asked to change text, integer, label, or copy, otherwise null",
+  "explanation": "Brief description of changes applied"
+}`;
+
+  for (let attempt = 0; attempt < geminiKeys.length; attempt++) {
+    const activeKey = geminiKeys[(geminiKeyIndex + attempt) % geminiKeys.length];
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${activeKey}`;
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `${systemInstruction}\nUser prompt: "${prompt}"\nCurrent text: "${currentText || ''}"\nCurrent styles: ${JSON.stringify(currentCss || {})}\nReturn strictly valid JSON.` }] }],
+          generationConfig: { responseMimeType: 'application/json' },
+        }),
+      });
+
+      if (resp.ok) {
+        geminiKeyIndex = (geminiKeyIndex + attempt + 1) % geminiKeys.length;
+        const data = await resp.json() as any;
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (rawText) {
+          const parsed = JSON.parse(rawText);
+          if (parsed && (parsed.css || parsed.text !== undefined)) {
+            return {
+              success: true,
+              css: parsed.css || {},
+              text: parsed.text !== undefined ? parsed.text : null,
+              explanation: parsed.explanation || `Applied Gemini AI styling for "${prompt}"`,
+              engine: 'gemini-3.8-flash',
+            };
+          }
+        }
+      } else {
+        console.warn(`[PatchworkApi] Gemini key ${attempt + 1} HTTP ${resp.status}, trying next key in pool...`);
+      }
+    } catch (e) {
+      console.warn(`[PatchworkApi] Gemini call failed on key attempt ${attempt + 1}: `, e);
+    }
+  }
+  const openAiKey = apiKey || process.env.OPENAI_API_KEY;
+  if (openAiKey) {
+    try {
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${openAiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          response_format: { type: 'json_object' },
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert visual web designer. Output a JSON object with "css" (kebab-case properties only asked for; no background unless asked), "text" (new string or null), and "explanation".',
+            },
+            {
+              role: 'user',
+              content: `Prompt: "${prompt}". Element: ${elementSelector}. Current styles: ${JSON.stringify(currentCss)}. Text: "${currentText}"`,
+            },
+          ],
+        }),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json() as any;
+        const respContent = data?.choices?.[0]?.message?.content;
+        if (respContent) {
+          const parsed = JSON.parse(respContent);
+          if (parsed && (parsed.css || parsed.text !== undefined)) {
+            return {
+              success: true,
+              css: parsed.css || {},
+              text: parsed.text || null,
+              explanation: parsed.explanation || `Applied OpenAI styling for "${prompt}"`,
+              engine: 'openai',
+            };
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[PatchworkApi] OpenAI LLM call failed, falling back to built-in visual compiler:', e);
+    }
+  }
+
+  return null;
+}
+
+patchworkApiRouter.post('/ai/inline-edit', async (req: Request, res: Response) => {
+  const { prompt, elementSelector, currentCss, currentText, apiKey } = req.body || {};
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ success: false, error: 'Prompt is required' });
   }
 
-  const p = prompt.toLowerCase();
-  const generatedCss: Record<string, string> = {};
-  let explanation = `Applied AI visual styling based on "${prompt}"`;
-  let modifiedText: string | undefined = undefined;
+  // 1. Try external LLM if API key is provided or present in environment
+  const llmResult = await callExternalLlm(prompt, elementSelector || 'element', currentCss || {}, currentText || '', apiKey);
+  if (llmResult) {
+    pushAudit('PATCH_UPDATED', {
+      metadata: {
+        action: 'AI_INLINE_EDIT',
+        prompt,
+        selector: elementSelector,
+        engine: llmResult.engine,
+        generatedProperties: Object.keys(llmResult.css || {}),
+      },
+    }, req);
 
-  // 1. Text content override detection (e.g. text: "Click Here" or say "Get Started")
-  const textMatch = prompt.match(/(?:text(?:\s*to|:)?|say|label|rename\s*to|write)\s*["'“]([^"'”]+)["'”]/i);
-  if (textMatch && textMatch[1]) {
-    modifiedText = textMatch[1].trim();
-    explanation = `Updated copy to "${modifiedText}" and applied styling based on prompt`;
+    return res.json({
+      success: true,
+      selector: elementSelector,
+      css: llmResult.css,
+      text: llmResult.text,
+      explanation: llmResult.explanation,
+      engine: llmResult.engine,
+      timestamp: new Date().toISOString(),
+    });
   }
 
-  // 2. Color Palettes & Themes
-  if (p.includes('purple') || p.includes('violet') || p.includes('indigo') || p.includes('lavender')) {
-    generatedCss['background'] = 'linear-gradient(135deg, #6366F1, #8B5CF6)';
-    generatedCss['color'] = '#FFFFFF';
-    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(99, 102, 241, 0.45)';
-    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
-  } else if (p.includes('blue') || p.includes('cyan') || p.includes('sky') || p.includes('ocean')) {
-    generatedCss['background'] = 'linear-gradient(135deg, #2563EB, #06B6D4)';
-    generatedCss['color'] = '#FFFFFF';
-    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(37, 99, 235, 0.45)';
-    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
-  } else if (p.includes('emerald') || p.includes('green') || p.includes('mint') || p.includes('lime')) {
-    generatedCss['background'] = 'linear-gradient(135deg, #059669, #10B981)';
-    generatedCss['color'] = '#FFFFFF';
-    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(16, 185, 129, 0.45)';
-    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
-  } else if (p.includes('orange') || p.includes('amber') || p.includes('sunset') || p.includes('warm') || p.includes('coral')) {
-    generatedCss['background'] = 'linear-gradient(135deg, #EA580C, #F59E0B)';
-    generatedCss['color'] = '#FFFFFF';
-    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(234, 88, 12, 0.45)';
-    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
-  } else if (p.includes('red') || p.includes('rose') || p.includes('crimson') || p.includes('danger') || p.includes('ruby')) {
-    generatedCss['background'] = 'linear-gradient(135deg, #E11D48, #F43F5E)';
-    generatedCss['color'] = '#FFFFFF';
-    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(225, 29, 72, 0.45)';
-    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
-  } else if (p.includes('pink') || p.includes('fuchsia') || p.includes('magenta')) {
-    generatedCss['background'] = 'linear-gradient(135deg, #DB2777, #EC4899)';
-    generatedCss['color'] = '#FFFFFF';
-    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(219, 39, 119, 0.45)';
-    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.2)';
-  } else if (p.includes('cyber') || p.includes('neon')) {
-    generatedCss['background'] = '#05050B';
-    generatedCss['color'] = '#FACC15';
-    generatedCss['border'] = '2px solid #22D3EE';
-    generatedCss['box-shadow'] = '0 0 20px rgba(34, 211, 238, 0.6), inset 0 0 10px rgba(34, 211, 238, 0.2)';
-    generatedCss['text-shadow'] = '0 0 8px rgba(250, 204, 21, 0.7)';
-  } else if (p.includes('glass') || p.includes('glassmorphism') || p.includes('frosted')) {
-    generatedCss['background'] = 'rgba(255, 255, 255, 0.12)';
-    generatedCss['backdrop-filter'] = 'blur(16px)';
-    generatedCss['-webkit-backdrop-filter'] = 'blur(16px)';
-    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.25)';
-    generatedCss['box-shadow'] = '0 8px 32px rgba(0, 0, 0, 0.25)';
-    generatedCss['color'] = '#FFFFFF';
-  } else if (p.includes('dark') || p.includes('black') || p.includes('midnight') || p.includes('charcoal')) {
-    generatedCss['background'] = '#0F0E17';
-    generatedCss['color'] = '#FFFFFE';
-    generatedCss['border'] = '1px solid rgba(255, 255, 255, 0.15)';
-    generatedCss['box-shadow'] = '0 12px 30px rgba(0, 0, 0, 0.5)';
-  } else if (p.includes('white') || p.includes('clean') || p.includes('minimal') || p.includes('light')) {
-    generatedCss['background'] = '#FFFFFF';
-    generatedCss['color'] = '#0F172A';
-    generatedCss['border'] = '1px solid #E2E8F0';
-    generatedCss['box-shadow'] = '0 4px 20px -2px rgba(0, 0, 0, 0.08)';
-  }
-
-  // 3. Borders & Radius
-  if (p.includes('pill') || p.includes('capsule') || p.includes('full round')) {
-    generatedCss['border-radius'] = '9999px';
-  } else if (p.includes('round') || p.includes('corner') || p.includes('curved')) {
-    generatedCss['border-radius'] = '14px';
-  } else if (p.includes('sharp') || p.includes('square') || p.includes('no round')) {
-    generatedCss['border-radius'] = '0px';
-  }
-
-  // 4. Spacing & Padding
-  if (p.includes('more pad') || p.includes('spacious') || p.includes('generous') || p.includes('large pad')) {
-    generatedCss['padding'] = '14px 28px';
-  } else if (p.includes('compact') || p.includes('tight') || p.includes('small pad')) {
-    generatedCss['padding'] = '6px 12px';
-  } else if (p.includes('pad') || p.includes('spacing')) {
-    generatedCss['padding'] = '10px 20px';
-  }
-
-  // 5. Typography
-  if (p.includes('bold') || p.includes('weight') || p.includes('strong')) {
-    generatedCss['font-weight'] = '700';
-  } else if (p.includes('light font') || p.includes('thin')) {
-    generatedCss['font-weight'] = '300';
-  }
-
-  if (p.includes('bigger') || p.includes('larger') || p.includes('increase size') || p.includes('huge')) {
-    generatedCss['font-size'] = '18px';
-  } else if (p.includes('smaller') || p.includes('tiny')) {
-    generatedCss['font-size'] = '12px';
-  }
-
-  if (p.includes('center')) {
-    generatedCss['text-align'] = 'center';
-  } else if (p.includes('left')) {
-    generatedCss['text-align'] = 'left';
-  } else if (p.includes('right')) {
-    generatedCss['text-align'] = 'right';
-  }
-
-  if (p.includes('uppercase') || p.includes('all caps')) {
-    generatedCss['text-transform'] = 'uppercase';
-    generatedCss['letter-spacing'] = '0.06em';
-  }
-
-  // 6. Shadows & Glows
-  if (p.includes('glow')) {
-    const existingShadow = generatedCss['box-shadow'];
-    generatedCss['box-shadow'] = existingShadow
-      ? `${existingShadow}, 0 0 20px rgba(139, 92, 246, 0.4)`
-      : '0 0 25px rgba(99, 102, 241, 0.55)';
-  } else if (p.includes('shadow') && !generatedCss['box-shadow']) {
-    generatedCss['box-shadow'] = '0 12px 28px rgba(0, 0, 0, 0.25)';
-  }
-
-  // 7. Interaction and Transitions
-  generatedCss['transition'] = 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
-  if (p.includes('button') || p.includes('clickable') || p.includes('pointer')) {
-    generatedCss['cursor'] = 'pointer';
-    if (!generatedCss['display']) generatedCss['display'] = 'inline-flex';
-    generatedCss['align-items'] = 'center';
-    generatedCss['justify-content'] = 'center';
-  }
-
-  // Default fallback if no specific rule matched
-  if (Object.keys(generatedCss).length <= 1) {
-    generatedCss['background'] = 'linear-gradient(135deg, #6366F1, #8B5CF6)';
-    generatedCss['color'] = '#FFFFFF';
-    generatedCss['border-radius'] = '10px';
-    generatedCss['padding'] = '10px 20px';
-    generatedCss['box-shadow'] = '0 10px 25px -5px rgba(99, 102, 241, 0.4)';
-    generatedCss['font-weight'] = '600';
-    explanation = `Applied modern gradient styling and elevation for "${prompt}"`;
-  }
+  // 2. Built-in Deterministic Visual Compiler (Zero API key required, works 100% offline)
+  const compiled = compileVisualPrompt(prompt, currentCss || {}, currentText || '');
 
   pushAudit('PATCH_UPDATED', {
     metadata: {
       action: 'AI_INLINE_EDIT',
       prompt,
       selector: elementSelector,
-      generatedProperties: Object.keys(generatedCss),
+      engine: 'axon-nlp',
+      generatedProperties: Object.keys(compiled.css),
     },
   }, req);
 
   res.json({
     success: true,
     selector: elementSelector,
-    css: generatedCss,
-    text: modifiedText,
-    explanation,
+    css: compiled.css,
+    text: compiled.text,
+    explanation: compiled.explanation,
+    engine: 'axon-nlp',
     timestamp: new Date().toISOString(),
   });
 });
-

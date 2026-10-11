@@ -511,6 +511,36 @@
   ],
   "extensionSessions": [
     {
+      "id": "ext-sess-1791677247440",
+      "userId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+      "workspaceId": "ws-prod-1",
+      "deviceName": "Chrome Inspector Client",
+      "browser": "Chrome 129",
+      "tokenHash": "hash_axon_ext_tok_179...",
+      "token": "axon_ext_tok_1791677247440_qf7jl8o4",
+      "user": {
+        "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "name": "Shreyas Mahajan",
+        "email": "shreyasmahajan0306@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "githubUsername": "shreyas04venom"
+      },
+      "permissions": [
+        "read:projects",
+        "write:patches",
+        "read:collaborators",
+        "realtime:presence",
+        "audit:events"
+      ],
+      "createdAt": "2026-10-11T00:07:27.440Z",
+      "lastActiveAt": "Just now",
+      "expiresAt": "2026-11-10T00:07:27.440Z"
+    },
+    {
       "id": "ext-sess-1791675122964",
       "userId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
       "workspaceId": "ws-prod-1",
@@ -867,6 +897,30 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "aud-1791677247441-9dgt",
+      "action": "EXTENSION_PAIRED",
+      "user": {
+        "id": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "name": "Shreyas Mahajan",
+        "email": "shreyasmahajan0306@gmail.com",
+        "avatar": "https://img.clerk.com/eyJ0eXBlIjoicHJveHkiLCJzcmMiOiJodHRwczovL2ltYWdlcy5jbGVyay5kZXYvb2F1dGhfZ29vZ2xlL2ltZ18zS1ZKdXpacUFicktRUGFqZUprdFlTQkt0MXkifQ",
+        "role": "owner",
+        "cursorColor": "#6366F1",
+        "timezone": "Asia/Calcutta",
+        "clerkId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E",
+        "githubUsername": "shreyas04venom"
+      },
+      "timestamp": "2026-10-11T00:07:27.441Z",
+      "ip": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+      "result": "success",
+      "metadata": {
+        "device": "Chrome Inspector Client",
+        "browser": "Chrome 129",
+        "userId": "user_3KVJuxyzybQ5jfsd24jzdLGzQ2E"
+      }
+    },
     {
       "id": "aud-1791675294044-w1bj",
       "action": "PATCH_CREATED",
