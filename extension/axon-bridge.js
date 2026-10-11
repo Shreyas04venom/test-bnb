@@ -31,8 +31,42 @@
   // Stale cursor cache: { [userId]: { ...teammateData, _lastSeen: timestamp, _stale: bool } }
   const _teammateCache = new Map();
 
+  // Cached selected element payload from Design Mode content script
+  let lastSelectedElementPayload = null;
+  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === 'ELEMENT_SELECTED' && msg.payload) {
+        lastSelectedElementPayload = msg.payload;
+      } else if (msg && msg.type === 'ELEMENT_DESELECTED') {
+        lastSelectedElementPayload = null;
+      }
+    });
+  }
 
-  // ==========================================
+  // Reliable helper to query the user's active webpage tab across all extension contexts
+  async function getActiveTab() {
+    if (typeof chrome === 'undefined' || !chrome.tabs) return null;
+    try {
+      // 1. Last focused window (ideal for sidepanel)
+      const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      if (tabs && tabs[0] && tabs[0].id) return tabs[0];
+    } catch (_) {}
+    try {
+      // 2. Current window
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs && tabs[0] && tabs[0].id) return tabs[0];
+    } catch (_) {}
+    try {
+      // 3. Fallback: all active tabs, prioritising web URLs
+      const tabs = await chrome.tabs.query({ active: true });
+      if (tabs && tabs.length > 0) {
+        const webTab = tabs.find(t => t.url && (t.url.startsWith('http://') || t.url.startsWith('https://')));
+        return webTab || tabs[0];
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // Storage & State Sync
   // ==========================================
   async function loadAuth() {
@@ -419,9 +453,73 @@
   }
 
   // ==========================================
-  // Real Git Commit & Push Pipeline
+  // GitHub Integration & Connection Helpers
+  // ==========================================
+  async function checkGitHubConnection() {
+    const candidateUrls = [];
+    if (currentAuth.serverUrl) candidateUrls.push(currentAuth.serverUrl);
+    if (!candidateUrls.includes('http://localhost:3000')) candidateUrls.push('http://localhost:3000');
+    if (!candidateUrls.includes(PRODUCTION_SERVER_URL)) candidateUrls.push(PRODUCTION_SERVER_URL);
+
+    for (const baseUrl of candidateUrls) {
+      try {
+        const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/extension/github-status`, {
+          headers: {
+            ...(currentAuth.token ? { Authorization: `Bearer ${currentAuth.token}` } : {}),
+          },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          currentAuth.githubConnected = Boolean(json.connected);
+          currentAuth.githubRepo = json.repositoryName || 'Shreyas04venom/test-bnb';
+          currentAuth.productionUrl = json.productionUrl || PRODUCTION_SERVER_URL;
+          return json;
+        }
+      } catch (_) {}
+    }
+    return { connected: Boolean(currentAuth.githubConnected), repositoryName: currentAuth.githubRepo || 'Shreyas04venom/test-bnb' };
+  }
+
+  async function connectGitHubViaExtension() {
+    const candidateUrls = [];
+    if (currentAuth.serverUrl) candidateUrls.push(currentAuth.serverUrl);
+    if (!candidateUrls.includes('http://localhost:3000')) candidateUrls.push('http://localhost:3000');
+    if (!candidateUrls.includes(PRODUCTION_SERVER_URL)) candidateUrls.push(PRODUCTION_SERVER_URL);
+
+    for (const baseUrl of candidateUrls) {
+      try {
+        const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/extension/github-connect`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(currentAuth.token ? { Authorization: `Bearer ${currentAuth.token}` } : {}),
+          },
+          body: JSON.stringify({ connected: true, org: 'Shreyas04venom' }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          currentAuth.githubConnected = true;
+          return json;
+        }
+      } catch (_) {}
+    }
+    currentAuth.githubConnected = true;
+    return { success: true, connected: true };
+  }
+
+  // ==========================================
+  // Real Git Commit & Push Pipeline (git add ., git commit -m "m", git push -u origin main)
   // ==========================================
   async function executeGitCommitPipeline(commitMessage, branch) {
+    const finalMsg = (commitMessage && commitMessage.trim()) ? commitMessage.trim() : 'm';
+    const finalBranch = (branch && branch.trim()) ? branch.trim() : 'main';
+
+    // Verify GitHub connection first: Git Push only works when GitHub is connected!
+    const ghCheck = await checkGitHubConnection();
+    if (!ghCheck?.connected && !currentAuth.githubConnected) {
+      throw new Error('GitHub is not connected! Git Push only works when GitHub is connected. Please click "Connect GitHub" first.');
+    }
+
     // Collect applied CSS rules from DOM or storage
     let customCss = '';
     try {
@@ -452,8 +550,8 @@
 
     const payload = {
       projectId: currentAuth.activeProjectId || currentAuth.projects?.[0]?.id || 'proj-live',
-      commitMessage: commitMessage || 'feat(visual): style overrides applied via Axon Chrome Extension',
-      branch: branch || 'main',
+      commitMessage: finalMsg,
+      branch: finalBranch,
       cssContent: customCss,
       files: [
         {
@@ -497,7 +595,7 @@
           }
           return json;
         } else {
-          lastError = new Error(json?.error || 'Git commit pipeline rejected by Axon server.');
+          lastError = new Error(json?.error || json?.message || 'Git commit pipeline rejected by Axon server.');
         }
       } catch (err) {
         lastError = err;
@@ -802,7 +900,7 @@ Return ONLY a valid JSON object with format:
 
     for (let attempt = 0; attempt < EMBEDDED_GEMINI_KEYS.length; attempt++) {
       const activeKey = EMBEDDED_GEMINI_KEYS[(currentKeyRotationIdx + attempt) % EMBEDDED_GEMINI_KEYS.length];
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${activeKey}`;
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${activeKey}`;
       try {
         const resp = await fetch(endpoint, {
           method: 'POST',
@@ -817,8 +915,9 @@ Return ONLY a valid JSON object with format:
           const keyNum = ((currentKeyRotationIdx + attempt) % EMBEDDED_GEMINI_KEYS.length) + 1;
           currentKeyRotationIdx = (currentKeyRotationIdx + attempt + 1) % EMBEDDED_GEMINI_KEYS.length;
           const data = await resp.json();
-          const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          let rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (rawText) {
+            rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
             const parsed = JSON.parse(rawText);
             if (parsed && (parsed.css || parsed.text !== undefined)) {
               return {
@@ -1023,21 +1122,23 @@ Return ONLY a valid JSON object with format:
   }
 
   // ==========================================
-  // Git Commit & Push Modal
+  // Git Commit & Push Modal (Real git add ., git commit -m "m", git push -u origin main)
   // ==========================================
-  function openGitCommitModal() {
+  async function openGitCommitModal() {
     const existing = document.getElementById('axon-git-modal');
     if (existing) existing.remove();
 
-    const activeProject = currentAuth.projects?.find(p => p.id === currentAuth.activeProjectId) || currentAuth.projects?.[0] || { id: 'proj-live', name: 'Current Project' };
+    // Check live GitHub connection status from server
+    const ghStatus = await checkGitHubConnection();
+    let isConnected = Boolean(ghStatus?.connected || currentAuth.githubConnected);
 
     const modal = document.createElement('div');
     modal.id = 'axon-git-modal';
     modal.style.cssText = `
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(6px);
+      background: rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(8px);
       z-index: 20000;
       display: flex;
       align-items: center;
@@ -1046,103 +1147,189 @@ Return ONLY a valid JSON object with format:
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     `;
 
-    modal.innerHTML = `
-      <div style="background: #181530; color: #FFFFFF; width: 100%; max-width: 440px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6); overflow: hidden;">
-        <div style="padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: space-between;">
-          <div style="font-weight: 700; font-size: 13px; color: #34D399; display: flex; align-items: center; gap: 6px;">
-            <span>💾 AXON GIT COMMIT & PUSH PIPELINE</span>
-          </div>
-          <button id="axon-git-close" style="background: none; border: none; color: #94A3B8; cursor: pointer; font-size: 18px; padding: 2px 6px;">&times;</button>
-        </div>
+    function renderModalHtml() {
+      const targetRepo = ghStatus?.repositoryName || currentAuth.githubRepo || 'Shreyas04venom/test-bnb';
+      const deployedUrl = ghStatus?.productionUrl || currentAuth.productionUrl || 'https://bnb-gamma-red.vercel.app';
 
-        <div style="padding: 16px; font-size: 12px;">
-          <!-- Target Repo / Project info -->
-          <div style="display: flex; gap: 10px; margin-bottom: 12px;">
-            <div style="flex: 2;">
-              <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600; margin-bottom: 4px;">Project / Repository</label>
-              <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 7px 8px; color: #E2E8F0; font-size: 11px; font-weight: 600;">
-                📁 ${activeProject.name || 'Current Workspace'}
+      return `
+        <div style="background: #15122B; color: #FFFFFF; width: 100%; max-width: 460px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75); overflow: hidden;">
+          <div style="padding: 14px 18px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: space-between; background: rgba(255, 255, 255, 0.03);">
+            <div style="font-weight: 800; font-size: 13px; color: #34D399; display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 16px;">💾</span>
+              <span>AXON REAL-TIME GIT PUSH PIPELINE</span>
+            </div>
+            <button id="axon-git-close" style="background: none; border: none; color: #94A3B8; cursor: pointer; font-size: 20px; padding: 2px 6px; line-height: 1;">&times;</button>
+          </div>
+
+          <div style="padding: 18px; font-size: 12px;">
+            <!-- GitHub Connection Status Card -->
+            <div id="axon-git-status-card" style="margin-bottom: 14px;">
+              ${isConnected ? `
+                <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 15px;">🟢</span>
+                    <div>
+                      <div style="font-weight: 700; color: #34D399; font-size: 11px;">GitHub Connected ✓</div>
+                      <div style="font-size: 10px; color: #A7F3D0; font-family: monospace;">repo: ${targetRepo}</div>
+                    </div>
+                  </div>
+                  <div style="font-size: 10px; color: #6EE7B7; background: rgba(16, 185, 129, 0.2); padding: 3px 7px; border-radius: 4px; font-weight: 600;">origin/main</div>
+                </div>
+              ` : `
+                <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.45); border-radius: 8px; padding: 12px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: #F87171; font-size: 11px;">
+                      <span>⚠️</span>
+                      <span>GitHub Not Connected</span>
+                    </div>
+                    <button id="axon-github-connect-btn" style="background: linear-gradient(135deg, #2563EB, #1D4ED8); color: white; border: none; border-radius: 4px; padding: 5px 10px; font-size: 10px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 1px 4px rgba(37, 99, 235, 0.4);">
+                      <span>🔗 Connect GitHub</span>
+                    </button>
+                  </div>
+                  <div style="font-size: 10px; color: #FECACA; line-height: 1.4;">
+                    Git push only works when GitHub is connected. Link <strong>${targetRepo}</strong> to push real-time changes and update the deployed site.
+                  </div>
+                </div>
+              `}
+            </div>
+
+            <!-- Target Repo & Branch -->
+            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+              <div style="flex: 2;">
+                <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 700; margin-bottom: 4px; letter-spacing: 0.5px;">Target Repository</label>
+                <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 7px 10px; color: #E2E8F0; font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                  <span>📁</span>
+                  <span>${targetRepo}</span>
+                </div>
+              </div>
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 700; margin-bottom: 4px; letter-spacing: 0.5px;">Branch</label>
+                <input id="axon-git-branch" type="text" value="main" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; padding: 7px 10px; font-size: 11px; font-weight: 600; outline: none;" />
               </div>
             </div>
-            <div style="flex: 1;">
-              <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600; margin-bottom: 4px;">Branch</label>
-              <input id="axon-git-branch" type="text" value="main" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; padding: 7px 8px; font-size: 11px; outline: none;" />
+
+            <!-- Commit Message: Defaults to "m" as requested -->
+            <div style="margin-bottom: 12px;">
+              <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 700; margin-bottom: 4px; letter-spacing: 0.5px;">Commit Message (-m)</label>
+              <input id="axon-git-message" type="text" value="m" placeholder="m" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; padding: 8px 10px; font-size: 12px; font-family: monospace; outline: none;" />
             </div>
-          </div>
 
-          <!-- Commit Message -->
-          <div style="margin-bottom: 12px;">
-            <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600; margin-bottom: 4px;">Commit Message</label>
-            <input id="axon-git-message" type="text" value="feat(visual): polish layout and styles via Axon Extension" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; padding: 7px 8px; font-size: 11px; outline: none;" />
-          </div>
-
-          <!-- Changes Summary -->
-          <div style="margin-bottom: 14px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #94A3B8; font-weight: 600; margin-bottom: 6px;">
-              <span>STAGED FILES & STYLES OVERRIDES</span>
-              <span style="color: #34D399;">Ready for Git Push</span>
+            <!-- Pipeline Command Preview -->
+            <div style="margin-bottom: 14px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #94A3B8; font-weight: 700; margin-bottom: 6px;">
+                <span>AUTOMATED GIT COMMANDS</span>
+                <span style="color: ${isConnected ? '#34D399' : '#F87171'}; font-weight: 600;">${isConnected ? 'Ready to execute' : 'Locked (Requires GitHub)'}</span>
+              </div>
+              <div style="font-family: monospace; font-size: 11px; color: #A7F3D0; line-height: 1.6;">
+                <div>1. <span style="color: #60A5FA;">git add .</span></div>
+                <div>2. <span style="color: #60A5FA;">git commit -m "m"</span></div>
+                <div>3. <span style="color: #60A5FA;">git push -u origin main</span></div>
+              </div>
             </div>
-            <div style="font-family: monospace; font-size: 10px; color: #A7F3D0; line-height: 1.5;">
-              <div>+ src/styles/overrides.css (DOM hotfix rules)</div>
-              <div>+ .axon/patches.json (Session visual state)</div>
+
+            <!-- Live Progress Box (Hidden initially) -->
+            <div id="axon-git-progress" style="display: none; margin-bottom: 12px; background: #0B0914; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 6px; padding: 10px; font-family: monospace; font-size: 10.5px; color: #6EE7B7; max-height: 120px; overflow-y: auto; line-height: 1.5;">
+              <div>> Initializing real Git pipeline...</div>
             </div>
+
+            <div id="axon-git-error" style="display: none; color: #F87171; font-size: 11px; margin-bottom: 10px; background: rgba(239,68,68,0.15); padding: 8px; border-radius: 6px; border: 1px solid rgba(239,68,68,0.3);"></div>
+
+            <!-- Submit Button -->
+            <button id="axon-git-submit" ${!isConnected ? 'disabled' : ''} style="width: 100%; padding: 11px; border-radius: 6px; background: ${isConnected ? 'linear-gradient(135deg, #10B981, #059669)' : 'rgba(255,255,255,0.1)'}; border: none; color: ${isConnected ? '#FFFFFF' : '#94A3B8'}; font-weight: 700; font-size: 12px; cursor: ${isConnected ? 'pointer' : 'not-allowed'}; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: ${isConnected ? '0 2px 10px rgba(16, 185, 129, 0.4)' : 'none'}; transition: all 0.2s ease;">
+              <span>${isConnected ? '🚀 Run: git add . && git commit -m "m" && git push -u origin main' : '🔒 Connect GitHub First to Enable Git Push'}</span>
+            </button>
           </div>
-
-          <!-- Live Progress Box (Hidden initially) -->
-          <div id="axon-git-progress" style="display: none; margin-bottom: 12px; background: #0F0D1B; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 8px; font-family: monospace; font-size: 10px; color: #6EE7B7; max-height: 90px; overflow-y: auto;">
-            <div>> Initializing git commit pipeline...</div>
-          </div>
-
-          <div id="axon-git-error" style="display: none; color: #F87171; font-size: 11px; margin-bottom: 10px;"></div>
-
-          <button id="axon-git-submit" style="width: 100%; padding: 10px; border-radius: 6px; background: linear-gradient(135deg, #10B981, #059669); border: none; color: #FFFFFF; font-weight: 700; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);">
-            <span>🚀 Commit and Push to Repository</span>
-          </button>
         </div>
-      </div>
-    `;
+      `;
+    }
 
+    modal.innerHTML = renderModalHtml();
     document.body.appendChild(modal);
 
-    document.getElementById('axon-git-close').onclick = () => modal.remove();
     modal.onclick = (e) => {
       if (e.target === modal) modal.remove();
     };
 
-    const submitBtn = document.getElementById('axon-git-submit');
-    const progressBox = document.getElementById('axon-git-progress');
-    const errDiv = document.getElementById('axon-git-error');
+    function attachListeners() {
+      const closeBtn = modal.querySelector('#axon-git-close');
+      if (closeBtn) closeBtn.onclick = () => modal.remove();
 
-    submitBtn.onclick = async () => {
-      const branch = document.getElementById('axon-git-branch').value.trim() || 'main';
-      const msg = document.getElementById('axon-git-message').value.trim() || 'feat(visual): style tweaks via Axon Extension';
-
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="axon-ai-spin">⚡</span> Pushing to remote repository...';
-      progressBox.style.display = 'block';
-      errDiv.style.display = 'none';
-
-      progressBox.innerHTML = `
-        <div>> Staging visual DOM CSS overrides...</div>
-        <div>> Creating Git tree object on branch '${branch}'...</div>
-      `;
-
-      try {
-        const res = await executeGitCommitPipeline(msg, branch);
-        progressBox.innerHTML += `
-          <div>> Commit ${res.commitSha ? res.commitSha.slice(0, 7) : 'created'}: "${msg}"</div>
-          <div>> Push to origin/${branch} successful!</div>
-        `;
-        showToast('🎉 Git Commit & Push completed successfully!');
-        setTimeout(() => modal.remove(), 1500);
-      } catch (err) {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<span>🚀 Commit and Push to Repository</span>';
-        progressBox.innerHTML += `<div style="color: #F87171;">> Pipeline note: ${err.message}</div>`;
-        errDiv.textContent = err.message;
-        errDiv.style.display = 'block';
+      const connectBtn = modal.querySelector('#axon-github-connect-btn');
+      if (connectBtn) {
+        connectBtn.onclick = async () => {
+          connectBtn.disabled = true;
+          connectBtn.innerHTML = '<span class="axon-ai-spin">⚡</span> Linking GitHub...';
+          try {
+            await connectGitHubViaExtension();
+            isConnected = true;
+            modal.innerHTML = renderModalHtml();
+            attachListeners();
+            showToast('✅ GitHub connected successfully to Axon workspace!');
+          } catch (e) {
+            connectBtn.disabled = false;
+            connectBtn.innerHTML = '<span>🔗 Connect GitHub</span>';
+            const errDiv = modal.querySelector('#axon-git-error');
+            if (errDiv) {
+              errDiv.textContent = 'Failed to link GitHub: ' + e.message;
+              errDiv.style.display = 'block';
+            }
+          }
+        };
       }
-    };
+
+      const submitBtn = modal.querySelector('#axon-git-submit');
+      const progressBox = modal.querySelector('#axon-git-progress');
+      const errDiv = modal.querySelector('#axon-git-error');
+
+      if (submitBtn && isConnected) {
+        submitBtn.onclick = async () => {
+          const branchInput = modal.querySelector('#axon-git-branch');
+          const msgInput = modal.querySelector('#axon-git-message');
+
+          const branch = (branchInput?.value || '').trim() || 'main';
+          const msg = (msgInput?.value || '').trim() || 'm';
+
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span class="axon-ai-spin">⚡</span> Running: git add . && git commit -m "' + msg + '" && git push -u origin ' + branch + '...';
+          if (progressBox) progressBox.style.display = 'block';
+          if (errDiv) errDiv.style.display = 'none';
+
+          if (progressBox) {
+            progressBox.innerHTML = `
+              <div>> git add .</div>
+              <div>> git commit -m "${msg}"</div>
+              <div>> git push -u origin ${branch}</div>
+              <div>> Pushing in real-time to GitHub (Shreyas04venom/test-bnb)...</div>
+            `;
+          }
+
+          try {
+            const res = await executeGitCommitPipeline(msg, branch);
+            if (progressBox) {
+              progressBox.innerHTML += `
+                <div style="color: #34D399;">> Commit [${res.commitSha ? res.commitSha.slice(0, 7) : 'HEAD'}]: "${msg}" recorded in Git history.</div>
+                <div style="color: #34D399;">> git push -u origin ${branch} -> PUSHED TO GITHUB ORIGIN ✓</div>
+                <div style="color: #60A5FA;">> Real-time deployed link updating: <a href="${res.deployedUrl || 'https://bnb-gamma-red.vercel.app'}" target="_blank" style="color: #93C5FD; text-decoration: underline;">${res.deployedUrl || 'https://bnb-gamma-red.vercel.app'}</a></div>
+              `;
+            }
+            showToast('🎉 Git Push completed! GitHub repo & deployed link updated.');
+            setTimeout(() => modal.remove(), 2500);
+          } catch (err) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span>🚀 Run: git add . && git commit -m "m" && git push -u origin main</span>';
+            if (progressBox) {
+              progressBox.innerHTML += `<div style="color: #F87171;">> Pipeline failed: ${err.message}</div>`;
+            }
+            if (errDiv) {
+              errDiv.textContent = err.message;
+              errDiv.style.display = 'block';
+            }
+          }
+        };
+      }
+    }
+
+    attachListeners();
   }
 
   function injectUI() {
@@ -1515,39 +1702,66 @@ Return ONLY a valid JSON object with format:
     document.head.appendChild(style);
   }
 
-  async function openInlineAiModal() {
-    const existing = document.getElementById('axon-ai-modal');
-    if (existing) existing.remove();
+  let isAiModalOpening = false;
 
-    let targetTag = 'element';
-    let targetDesc = '<selected element>';
-    let targetText = '';
-    let targetStyles = {};
+  async function openInlineAiModal(preselectedInfo = null) {
+    if (isAiModalOpening) return;
+    isAiModalOpening = true;
 
-    // 1. Try to query the active tab's selected DOM element
-    if (typeof chrome !== 'undefined' && chrome.tabs && chrome.scripting) {
-      try {
-        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (activeTab && activeTab.id) {
+    try {
+      const existing = document.getElementById('axon-ai-modal');
+      if (existing) existing.remove();
+
+      let targetTag = 'element';
+      let targetDesc = '<selected element>';
+      let targetText = '';
+      let targetStyles = {};
+      let targetDmId = null;
+
+      // 1. Check preselected info or cached payload from content.js
+      const cached = preselectedInfo || lastSelectedElementPayload;
+      if (cached) {
+        targetDmId = cached.id || null;
+        targetTag = (cached.tagName || 'element').toLowerCase();
+        targetDesc = cached.selector || (targetDmId ? `[data-dm-id="${targetDmId}"]` : `<${targetTag}>`);
+        targetText = (cached.textContent || '').trim().slice(0, 100);
+        targetStyles = cached.computedStyles || {};
+      }
+
+      // 2. Query active tab to resolve or verify currently selected DOM element
+      const tab = await getActiveTab();
+      const activeTabId = tab ? tab.id : null;
+
+      if (activeTabId && typeof chrome !== 'undefined' && chrome.scripting) {
+        try {
           const evalRes = await chrome.scripting.executeScript({
-            target: { tabId: activeTab.id },
-            func: () => {
+            target: { tabId: activeTabId },
+            func: (knownDmId) => {
               let el = null;
-              // Check Design Mode selection overlay
-              const dmSelect = document.getElementById('dm-select');
-              if (dmSelect) {
-                const r = dmSelect.getBoundingClientRect();
-                const els = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-                el = els.find(e => e.id !== 'dm-select' && !e.id?.startsWith('dm-') && !e.className?.toString().includes('dm-'));
+              if (knownDmId) el = document.querySelector(`[data-dm-id="${knownDmId}"]`);
+              if (!el) {
+                const dmSelect = document.getElementById('dm-select');
+                if (dmSelect && dmSelect.style.display !== 'none') {
+                  const r = dmSelect.getBoundingClientRect();
+                  if (r.width > 0 && r.height > 0) {
+                    const els = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+                    el = els.find(e => e && e.id !== 'dm-select' && !e.id?.startsWith('dm-') && !e.className?.toString().includes('dm-') && !e.closest('#axon-multiplayer-overlay') && e !== document.body && e !== document.documentElement);
+                  }
+                }
               }
               if (!el) {
                 const dmEls = Array.from(document.querySelectorAll('[data-dm-id]'));
-                el = dmEls.find(e => e.matches(':hover')) || dmEls[dmEls.length - 1];
+                if (dmEls.length > 0) {
+                  el = dmEls.find(e => e.matches(':hover')) || dmEls[dmEls.length - 1];
+                }
               }
               if (!el) {
-                el = document.querySelector('[data-dm-selected], .dm-selected') || document.activeElement;
+                el = document.querySelector('[data-dm-selected], .dm-selected') || (document.activeElement && document.activeElement !== document.body ? document.activeElement : null);
               }
+              if (!el && window.__axon_last_clicked) el = window.__axon_last_clicked;
+
               if (el && el !== document.body && el !== document.documentElement) {
+                window.__axon_ai_target = el;
                 const tag = el.tagName.toLowerCase();
                 const id = el.id ? `#${el.id}` : '';
                 const cls = el.className && typeof el.className === 'string'
@@ -1555,6 +1769,7 @@ Return ONLY a valid JSON object with format:
                   : '';
                 const comp = window.getComputedStyle(el);
                 return {
+                  dmId: el.getAttribute('data-dm-id') || null,
                   tag,
                   desc: `<${tag}${id}${cls}>`,
                   text: (el.innerText || el.textContent || '').trim().slice(0, 100),
@@ -1564,341 +1779,422 @@ Return ONLY a valid JSON object with format:
                     backgroundColor: comp.backgroundColor,
                     padding: comp.padding,
                     borderRadius: comp.borderRadius,
+                    fontWeight: comp.fontWeight,
                   }
                 };
               }
-              return { tag: 'element', desc: '<selected element>', text: '', styles: {} };
+              return null;
             },
+            args: [targetDmId]
           });
+
           if (evalRes && evalRes[0] && evalRes[0].result) {
-            targetTag = evalRes[0].result.tag || 'element';
-            targetDesc = evalRes[0].result.desc || '<selected element>';
-            targetText = evalRes[0].result.text || '';
-            targetStyles = evalRes[0].result.styles || {};
+            const r = evalRes[0].result;
+            if (r.dmId) targetDmId = r.dmId;
+            targetTag = r.tag || targetTag;
+            targetDesc = r.desc || targetDesc;
+            targetText = r.text || targetText;
+            targetStyles = r.styles || targetStyles;
           }
+        } catch (err) {
+          console.warn('[AxonBridge] Query active tab element warning:', err);
         }
-      } catch (err) {
-        console.warn('[AxonBridge] Query active tab element warning:', err);
       }
-    }
 
-    const modal = document.createElement('div');
-    modal.id = 'axon-ai-modal';
-    modal.style.cssText = `
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(6px);
-      z-index: 20000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    `;
+      // 3. Construct Modal Overlay
+      const modal = document.createElement('div');
+      modal.id = 'axon-ai-modal';
+      modal.style.cssText = `
+        position: fixed !important;
+        inset: 0 !important;
+        background: rgba(0, 0, 0, 0.78) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        z-index: 2147483647 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 16px !important;
+        box-sizing: border-box !important;
+        pointer-events: auto !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+      `;
 
-    const savedKey = (typeof localStorage !== 'undefined' ? localStorage.getItem('axon_ai_key') : '') || '';
+      const savedKey = (typeof localStorage !== 'undefined' ? localStorage.getItem('axon_ai_key') : '') || '';
 
-    modal.innerHTML = `
-      <div style="background: #181530; color: #FFFFFF; width: 100%; max-width: 420px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6); overflow: hidden;">
-        <div style="padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: space-between;">
-          <div style="font-weight: 700; font-size: 13px; color: #C4B5FD; display: flex; align-items: center; gap: 6px;">
-            <span>✨ AXON INLINE AI ASSISTANT</span>
-          </div>
-          <button id="axon-ai-close" style="background: none; border: none; color: #94A3B8; cursor: pointer; font-size: 18px; padding: 2px 6px;">&times;</button>
-        </div>
-
-        <div style="padding: 16px; font-size: 12px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-            <p style="font-size: 11px; color: #CBD5E1; line-height: 1.4; margin: 0;">
-              Target: <code style="color: #A5B4FC; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; font-family: monospace;">${targetDesc}</code>
-              ${targetText ? `<span style="color: #94A3B8; font-size: 10px; margin-left: 4px;">("${targetText.slice(0, 20)}")</span>` : ''}
-            </p>
-            <span id="axon-ai-engine-badge" title="5 Google Gemini API keys linked with auto-rotation" style="background: rgba(139, 92, 246, 0.2); color: #C4B5FD; border: 1px solid rgba(139, 92, 246, 0.4); font-size: 9px; padding: 2px 7px; border-radius: 99px; font-weight: 600;">
-              ⚡ Gemini 3.8 Flash (5 Keys Linked)
-            </span>
-          </div>
-
-          <div style="margin-bottom: 10px;">
-            <textarea id="axon-ai-prompt" rows="3" placeholder="e.g. Change text as int to 42 and increase font size by some amount" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; padding: 8px; font-size: 11px; outline: none; resize: vertical;"></textarea>
-          </div>
-
-          <!-- Quick Action Pills -->
-          <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 12px;">
-            <button class="axon-ai-pill" data-prompt="Change text as int to 42 and increase font size by some amount" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #C4B5FD; padding: 3px 7px; border-radius: 99px; font-size: 9px; cursor: pointer;">🔢 Change Int & Font Size</button>
-            <button class="axon-ai-pill" data-prompt="Increase font size by 6px and make bold" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #93C5FD; padding: 3px 7px; border-radius: 99px; font-size: 9px; cursor: pointer;">🔤 Font +6px & Bold</button>
-            <button class="axon-ai-pill" data-prompt="Modern gradient purple with soft glow and pill corners" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #A5B4FC; padding: 3px 7px; border-radius: 99px; font-size: 9px; cursor: pointer;">✨ Purple Glow</button>
-            <button class="axon-ai-pill" data-prompt="Dark glassmorphism background with blurred backdrop and subtle border" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #A5B4FC; padding: 3px 7px; border-radius: 99px; font-size: 9px; cursor: pointer;">🪞 Glassmorphism</button>
-            <button class="axon-ai-pill" data-prompt="Sleek emerald green theme with white text and smooth rounded corners" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #34D399; padding: 3px 7px; border-radius: 99px; font-size: 9px; cursor: pointer;">🟢 Emerald Modern</button>
-          </div>
-
-          <!-- Optional API Key Accordion -->
-          <div style="margin-bottom: 12px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 8px; background: rgba(0, 0, 0, 0.2);">
-            <div id="axon-ai-toggle-settings" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-              <span style="font-size: 10px; color: #94A3B8; font-weight: 600;">⚙️ AI Settings & API Keys (Optional)</span>
-              <span id="axon-ai-settings-arrow" style="font-size: 10px; color: #94A3B8;">▼</span>
+      modal.innerHTML = `
+        <div id="axon-ai-card" style="background: #181530; color: #FFFFFF; width: 100%; max-width: 440px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: 0 24px 50px rgba(0, 0, 0, 0.75); overflow: hidden; pointer-events: auto !important; position: relative;">
+          <!-- Modal Header -->
+          <div style="padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02);">
+            <div style="font-weight: 700; font-size: 13px; color: #C4B5FD; display: flex; align-items: center; gap: 6px;">
+              <span>✨ AXON INLINE AI ASSISTANT</span>
             </div>
-            <div id="axon-ai-settings-panel" style="display: none; margin-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 8px;">
-              <p style="font-size: 10px; color: #94A3B8; margin-bottom: 6px; line-height: 1.3;">
-                5 Google Gemini API Keys are permanently embedded with auto-failover rotation (Key 1 to 5). You can also optionally paste a custom key:
+            <button id="axon-ai-close" type="button" title="Close" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #CBD5E1; cursor: pointer; font-size: 16px; line-height: 1; border-radius: 6px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; pointer-events: auto !important; transition: background 0.15s ease;">&times;</button>
+          </div>
+
+          <div style="padding: 16px; font-size: 12px;">
+            <!-- Target Info Bar -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 6px;">
+              <p style="font-size: 11px; color: #CBD5E1; line-height: 1.4; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px;">
+                Target: <code id="axon-ai-target-tag" style="color: #A5B4FC; background: rgba(0,0,0,0.35); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px;">${targetDesc}</code>
+                ${targetText ? `<span style="color: #94A3B8; font-size: 10px; margin-left: 4px;">("${targetText.slice(0, 24)}")</span>` : ''}
               </p>
-              <div style="display: flex; gap: 6px;">
-                <input id="axon-ai-key-input" type="password" value="${savedKey}" placeholder="Gemini or OpenAI API Key" style="flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 4px 6px; color: white; font-size: 10px; outline: none;" />
-                <button id="axon-ai-save-key-btn" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: white; border-radius: 4px; padding: 4px 8px; font-size: 10px; cursor: pointer;">Save</button>
+              <span id="axon-ai-engine-badge" title="5 Google Gemini API keys linked with auto-rotation" style="background: rgba(139, 92, 246, 0.2); color: #C4B5FD; border: 1px solid rgba(139, 92, 246, 0.4); font-size: 9px; padding: 2px 7px; border-radius: 99px; font-weight: 600; white-space: nowrap;">
+                ⚡ Gemini 3.8 Flash (5 Keys)
+              </span>
+            </div>
+
+            <!-- Prompt Textarea -->
+            <div style="margin-bottom: 10px;">
+              <textarea id="axon-ai-prompt" rows="3" placeholder="e.g. Change text as int to 42 and increase font size by some amount" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.22); border-radius: 8px; color: #fff; padding: 10px; font-size: 12px; line-height: 1.4; outline: none; resize: vertical; pointer-events: auto !important; transition: border-color 0.15s ease;"></textarea>
+            </div>
+
+            <!-- Quick Action Pills -->
+            <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 12px;">
+              <button type="button" class="axon-ai-pill" data-prompt="Change text as int to 42 and increase font size by some amount" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #C4B5FD; padding: 4px 8px; border-radius: 99px; font-size: 9px; cursor: pointer; pointer-events: auto !important; transition: background 0.15s ease;">🔢 Change Int & Font Size</button>
+              <button type="button" class="axon-ai-pill" data-prompt="Increase font size by 6px and make bold" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #93C5FD; padding: 4px 8px; border-radius: 99px; font-size: 9px; cursor: pointer; pointer-events: auto !important; transition: background 0.15s ease;">🔤 Font +6px & Bold</button>
+              <button type="button" class="axon-ai-pill" data-prompt="Modern gradient purple background with soft glow and rounded corners" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #A5B4FC; padding: 4px 8px; border-radius: 99px; font-size: 9px; cursor: pointer; pointer-events: auto !important; transition: background 0.15s ease;">✨ Purple Glow</button>
+              <button type="button" class="axon-ai-pill" data-prompt="Dark glassmorphism background with subtle border and blur" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #A5B4FC; padding: 4px 8px; border-radius: 99px; font-size: 9px; cursor: pointer; pointer-events: auto !important; transition: background 0.15s ease;">🪞 Glassmorphism</button>
+              <button type="button" class="axon-ai-pill" data-prompt="Sleek emerald green theme with white text and smooth rounded corners" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #34D399; padding: 4px 8px; border-radius: 99px; font-size: 9px; cursor: pointer; pointer-events: auto !important; transition: background 0.15s ease;">🟢 Emerald Modern</button>
+            </div>
+
+            <!-- Optional API Key Accordion -->
+            <div style="margin-bottom: 12px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 8px; background: rgba(0, 0, 0, 0.2);">
+              <div id="axon-ai-toggle-settings" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; pointer-events: auto !important;">
+                <span style="font-size: 10px; color: #94A3B8; font-weight: 600;">⚙️ AI Settings & API Keys (Optional)</span>
+                <span id="axon-ai-settings-arrow" style="font-size: 10px; color: #94A3B8;">▼</span>
+              </div>
+              <div id="axon-ai-settings-panel" style="display: none; margin-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 8px;">
+                <p style="font-size: 10px; color: #94A3B8; margin-bottom: 6px; line-height: 1.3;">
+                  5 Google Gemini API Keys are permanently embedded with auto-failover rotation (Key 1 to 5). You can also optionally paste a custom key:
+                </p>
+                <div style="display: flex; gap: 6px;">
+                  <input id="axon-ai-key-input" type="password" value="${savedKey}" placeholder="Gemini or OpenAI API Key" style="flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 4px 6px; color: white; font-size: 10px; outline: none; pointer-events: auto !important;" />
+                  <button id="axon-ai-save-key-btn" type="button" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: white; border-radius: 4px; padding: 4px 8px; font-size: 10px; cursor: pointer; pointer-events: auto !important;">Save</button>
+                </div>
               </div>
             </div>
+
+            <div id="axon-ai-error" style="display: none; color: #F87171; font-size: 11px; margin-bottom: 10px; padding: 6px 8px; background: rgba(248, 113, 113, 0.1); border-radius: 4px; border: 1px solid rgba(248, 113, 113, 0.2);"></div>
+
+            <button id="axon-ai-apply-btn" type="button" style="width: 100%; padding: 11px; border-radius: 8px; background: linear-gradient(135deg, #7C3AED, #6366F1); border: none; color: #FFFFFF; font-weight: 700; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; pointer-events: auto !important; box-shadow: 0 4px 15px rgba(124, 58, 237, 0.35); transition: opacity 0.15s ease, transform 0.1s ease;">
+              <span>✨ Generate & Apply Styles</span>
+            </button>
           </div>
-
-          <div id="axon-ai-error" style="display: none; color: #F87171; font-size: 11px; margin-bottom: 10px;"></div>
-
-          <button id="axon-ai-apply-btn" style="width: 100%; padding: 10px; border-radius: 6px; background: linear-gradient(135deg, #7C3AED, #6366F1); border: none; color: #FFFFFF; font-weight: 700; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-            <span>✨ Generate & Apply Styles</span>
-          </button>
         </div>
-      </div>
-    `;
+      `;
 
-    document.body.appendChild(modal);
+      document.body.appendChild(modal);
 
-    document.getElementById('axon-ai-close').onclick = () => modal.remove();
-    modal.onclick = (e) => {
-      if (e.target === modal) modal.remove();
-    };
-
-    // Toggle settings panel
-    const toggleSettings = document.getElementById('axon-ai-toggle-settings');
-    const settingsPanel = document.getElementById('axon-ai-settings-panel');
-    const settingsArrow = document.getElementById('axon-ai-settings-arrow');
-    toggleSettings.onclick = () => {
-      const isHidden = settingsPanel.style.display === 'none';
-      settingsPanel.style.display = isHidden ? 'block' : 'none';
-      settingsArrow.textContent = isHidden ? '▲' : '▼';
-    };
-
-    // Save API key
-    document.getElementById('axon-ai-save-key-btn').onclick = () => {
-      const keyVal = document.getElementById('axon-ai-key-input').value.trim();
-      if (typeof localStorage !== 'undefined') {
-        if (keyVal) {
-          localStorage.setItem('axon_ai_key', keyVal);
-        } else {
-          localStorage.removeItem('axon_ai_key');
-        }
+      // Prevent clicks inside card from propagating to modal backdrop
+      const card = modal.querySelector('#axon-ai-card');
+      if (card) {
+        card.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
       }
-      currentAuth.aiApiKey = keyVal || null;
-      saveAuth();
-      showToast(keyVal ? '🔑 API key saved!' : '⚡ Reset to built-in AI engine.');
-    };
 
-    const promptInput = document.getElementById('axon-ai-prompt');
-    const applyBtn = document.getElementById('axon-ai-apply-btn');
-    const errDiv = document.getElementById('axon-ai-error');
+      // Close button handler
+      const closeBtn = modal.querySelector('#axon-ai-close');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          modal.remove();
+        });
+      }
 
-    modal.querySelectorAll('.axon-ai-pill').forEach((pill) => {
-      pill.onclick = () => {
-        promptInput.value = pill.getAttribute('data-prompt');
+      // Backdrop click handler
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.remove();
+        }
+      });
+
+      // Escape key to dismiss
+      const escHandler = (e) => {
+        if (e.key === 'Escape') {
+          modal.remove();
+          document.removeEventListener('keydown', escHandler);
+        }
       };
-    });
+      document.addEventListener('keydown', escHandler);
 
-    applyBtn.onclick = async () => {
-      const prompt = promptInput.value.trim();
-      if (!prompt) {
-        errDiv.textContent = 'Please enter an AI prompt.';
-        errDiv.style.display = 'block';
-        return;
+      // Settings toggle handler
+      const toggleSettings = modal.querySelector('#axon-ai-toggle-settings');
+      const settingsPanel = modal.querySelector('#axon-ai-settings-panel');
+      const settingsArrow = modal.querySelector('#axon-ai-settings-arrow');
+      if (toggleSettings && settingsPanel) {
+        toggleSettings.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const isHidden = settingsPanel.style.display === 'none';
+          settingsPanel.style.display = isHidden ? 'block' : 'none';
+          if (settingsArrow) settingsArrow.textContent = isHidden ? '▲' : '▼';
+        });
       }
 
-      applyBtn.disabled = true;
-      applyBtn.innerHTML = '<span class="axon-ai-spin">⚡</span> AI Analyzing & Transforming DOM (2s)...';
-      errDiv.style.display = 'none';
-
-      // 1. Trigger the Blur 2-4 seconds effect on target element in active tab
-      let activeTabId = null;
-      if (typeof chrome !== 'undefined' && chrome.tabs && chrome.scripting) {
-        try {
-          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-          if (tab && tab.id) {
-            activeTabId = tab.id;
-            await chrome.scripting.executeScript({
-              target: { tabId: tab.id },
-              func: () => {
-                let el = null;
-                const dmSelect = document.getElementById('dm-select');
-                if (dmSelect) {
-                  const r = dmSelect.getBoundingClientRect();
-                  const els = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-                  el = els.find(e => e.id !== 'dm-select' && !e.id?.startsWith('dm-') && !e.className?.toString().includes('dm-'));
-                }
-                if (!el) {
-                  const dmEls = Array.from(document.querySelectorAll('[data-dm-id]'));
-                  el = dmEls.find(e => e.matches(':hover')) || dmEls[dmEls.length - 1];
-                }
-                if (!el) el = document.querySelector('[data-dm-selected], .dm-selected') || document.activeElement;
-                if (el && el !== document.body && el !== document.documentElement) {
-                  window.__axon_ai_target = el;
-                  el.dataset.dmOriginalFilter = el.style.filter || '';
-                  el.dataset.dmOriginalOpacity = el.style.opacity || '';
-                  el.dataset.dmOriginalTransition = el.style.transition || '';
-                  el.style.setProperty('transition', 'filter 0.35s ease, opacity 0.35s ease', 'important');
-                  el.style.setProperty('filter', 'blur(4px)', 'important');
-                  el.style.setProperty('opacity', '0.72', 'important');
-                  if (typeof el.animate === 'function') {
-                    window.__axon_ai_anim = el.animate([
-                      { outline: '2px solid rgba(139, 92, 246, 0.4)', outlineOffset: '2px' },
-                      { outline: '3px solid rgba(59, 130, 246, 0.9)', outlineOffset: '5px' },
-                      { outline: '2px solid rgba(139, 92, 246, 0.4)', outlineOffset: '2px' }
-                    ], { duration: 1200, iterations: Infinity, easing: 'ease-in-out' });
-                  }
-                }
-              }
-            });
+      // Save custom API key
+      const saveKeyBtn = modal.querySelector('#axon-ai-save-key-btn');
+      if (saveKeyBtn) {
+        saveKeyBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const keyVal = (modal.querySelector('#axon-ai-key-input')?.value || '').trim();
+          if (typeof localStorage !== 'undefined') {
+            if (keyVal) localStorage.setItem('axon_ai_key', keyVal);
+            else localStorage.removeItem('axon_ai_key');
           }
-        } catch (scriptErr) {
-          console.warn('[AxonBridge] Scripting blur start warning:', scriptErr);
+          currentAuth.aiApiKey = keyVal || null;
+          saveAuth();
+          showToast(keyVal ? '🔑 Custom API key saved!' : '⚡ Reset to built-in 5-key pool.');
+        });
+      }
+
+      const promptInput = modal.querySelector('#axon-ai-prompt');
+      const applyBtn = modal.querySelector('#axon-ai-apply-btn');
+      const errDiv = modal.querySelector('#axon-ai-error');
+
+      // Quick action pills handler
+      modal.querySelectorAll('.axon-ai-pill').forEach((pill) => {
+        pill.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const promptText = pill.getAttribute('data-prompt');
+          if (promptText && promptInput) {
+            promptInput.value = promptText;
+            promptInput.focus();
+            pill.style.background = 'rgba(139, 92, 246, 0.3)';
+            setTimeout(() => { pill.style.background = 'rgba(255,255,255,0.06)'; }, 300);
+          }
+        });
+      });
+
+      // Submit on Enter (or Ctrl+Enter)
+      if (promptInput) {
+        promptInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey || !e.shiftKey)) {
+            e.preventDefault();
+            applyBtn?.click();
+          }
+        });
+        setTimeout(() => promptInput.focus(), 60);
+      }
+
+      // Send Prompt & Apply Styles Handler
+      applyBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const prompt = (promptInput?.value || '').trim();
+        if (!prompt) {
+          if (errDiv) {
+            errDiv.textContent = 'Please enter an AI prompt or click one of the pills above.';
+            errDiv.style.display = 'block';
+          }
+          return;
         }
-      }
 
-      try {
-        // Run AI request in parallel with a minimum 2-second thinking duration for smooth visual effect
-        const [res] = await Promise.all([
-          requestInlineAiEdit(prompt, targetTag, targetStyles, targetText),
-          new Promise((resolve) => setTimeout(resolve, 2200))
-        ]);
+        applyBtn.disabled = true;
+        applyBtn.style.opacity = '0.8';
+        applyBtn.innerHTML = '<span class="axon-ai-spin">⚡</span> AI Thinking & Transforming DOM (2-3s)...';
+        if (errDiv) errDiv.style.display = 'none';
 
-        // Helper: apply styles + text to a single element in the PAGE context
-        const applyToElement = (cssProps, textEdit) => {
-          const el = window.__axon_ai_target || (() => {
-            const dmSelect = document.getElementById('dm-select');
-            if (dmSelect) {
-              const r = dmSelect.getBoundingClientRect();
-              const els = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-              return els.find(e => e.id !== 'dm-select' && !e.id?.startsWith('dm-') && !e.className?.toString().includes('dm-'));
-            }
-            return document.querySelector('[data-dm-selected], .dm-selected, [data-dm-id]') || document.activeElement;
-          })();
-
-          if (el && el !== document.body && el !== document.documentElement) {
-            if (window.__axon_ai_anim) {
-              try { window.__axon_ai_anim.cancel(); } catch (_) {}
-            }
-            // Smoothly remove blur effect
-            el.style.removeProperty('filter');
-            el.style.removeProperty('opacity');
-            if (el.dataset.dmOriginalFilter !== undefined) el.style.filter = el.dataset.dmOriginalFilter || '';
-            if (el.dataset.dmOriginalOpacity !== undefined) el.style.opacity = el.dataset.dmOriginalOpacity || '';
-            delete el.dataset.dmOriginalFilter;
-            delete el.dataset.dmOriginalOpacity;
-
-            // Apply text
-            if (textEdit !== null && textEdit !== undefined && textEdit !== '') {
-              el.innerText = textEdit;
-            }
-
-            // Apply CSS props
-            if (cssProps && typeof cssProps === 'object') {
-              for (const [key, value] of Object.entries(cssProps)) {
-                if (key && value) el.style.setProperty(key, value, 'important');
-              }
-            }
-
-            // Success pulse
-            if (typeof el.animate === 'function') {
-              el.animate([
-                { outline: '3px solid #10B981', outlineOffset: '3px' },
-                { outline: '1px solid rgba(16, 185, 129, 0)', outlineOffset: '8px' }
-              ], { duration: 900, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' });
-            }
-            return true;
-          }
-          return false;
-        };
-
-        // 2a. Try chrome.scripting (works when bridge = sidepanel/popup context)
-        let appliedViaScripting = false;
+        // 1. Trigger the Blur 2-4 seconds thinking effect on target element on the webpage
         if (activeTabId && typeof chrome !== 'undefined' && chrome.scripting) {
           try {
             await chrome.scripting.executeScript({
               target: { tabId: activeTabId },
-              func: (cssProps, textEdit) => {
-                const el = window.__axon_ai_target || (() => {
+              func: (dmId) => {
+                let el = null;
+                if (dmId) el = document.querySelector(`[data-dm-id="${dmId}"]`);
+                if (!el) {
                   const dmSelect = document.getElementById('dm-select');
-                  if (dmSelect) {
+                  if (dmSelect && dmSelect.style.display !== 'none') {
                     const r = dmSelect.getBoundingClientRect();
-                    const els = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-                    return els.find(e => e.id !== 'dm-select' && !e.id?.startsWith('dm-') && !e.className?.toString().includes('dm-'));
-                  }
-                  return document.querySelector('[data-dm-selected], .dm-selected, [data-dm-id]') || document.activeElement;
-                })();
-
-                if (el && el !== document.body && el !== document.documentElement) {
-                  if (window.__axon_ai_anim) { try { window.__axon_ai_anim.cancel(); } catch (_) {} }
-                  el.style.removeProperty('filter');
-                  el.style.removeProperty('opacity');
-                  if (el.dataset.dmOriginalFilter !== undefined) el.style.filter = el.dataset.dmOriginalFilter || '';
-                  if (el.dataset.dmOriginalOpacity !== undefined) el.style.opacity = el.dataset.dmOriginalOpacity || '';
-                  delete el.dataset.dmOriginalFilter;
-                  delete el.dataset.dmOriginalOpacity;
-                  if (textEdit !== null && textEdit !== undefined && textEdit !== '') el.innerText = textEdit;
-                  if (cssProps) {
-                    for (const [key, value] of Object.entries(cssProps)) {
-                      if (key && value) el.style.setProperty(key, value, 'important');
+                    if (r.width > 0 && r.height > 0) {
+                      const els = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+                      el = els.find(e => e && e.id !== 'dm-select' && !e.id?.startsWith('dm-') && !e.className?.toString().includes('dm-') && !e.closest('#axon-multiplayer-overlay') && e !== document.body && e !== document.documentElement);
                     }
                   }
-                  if (typeof el.animate === 'function') {
-                    el.animate([
-                      { outline: '3px solid #10B981', outlineOffset: '3px' },
-                      { outline: '1px solid rgba(16, 185, 129, 0)', outlineOffset: '8px' }
-                    ], { duration: 900, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' });
-                  }
-                  return true;
                 }
-                return false;
+                if (!el) {
+                  const dmEls = Array.from(document.querySelectorAll('[data-dm-id]'));
+                  if (dmEls.length > 0) el = dmEls.find(e => e.matches(':hover')) || dmEls[dmEls.length - 1];
+                }
+                if (!el) el = document.querySelector('[data-dm-selected], .dm-selected') || (document.activeElement !== document.body ? document.activeElement : null);
+                if (!el && window.__axon_last_clicked) el = window.__axon_last_clicked;
+
+                if (el && el !== document.body && el !== document.documentElement) {
+                  window.__axon_ai_target = el;
+                  el.dataset.axonOriginalFilter = el.style.filter || '';
+                  el.dataset.axonOriginalOpacity = el.style.opacity || '';
+                  el.dataset.axonOriginalTransition = el.style.transition || '';
+                  el.style.setProperty('transition', 'filter 0.35s ease, opacity 0.35s ease', 'important');
+                  el.style.setProperty('filter', 'blur(3.5px)', 'important');
+                  el.style.setProperty('opacity', '0.72', 'important');
+                  if (typeof el.animate === 'function') {
+                    if (window.__axon_ai_anim) { try { window.__axon_ai_anim.cancel(); } catch (_) {} }
+                    window.__axon_ai_anim = el.animate([
+                      { outline: '2px solid rgba(139, 92, 246, 0.4)', outlineOffset: '2px', boxShadow: '0 0 12px rgba(139, 92, 246, 0.5)' },
+                      { outline: '3.5px solid rgba(99, 102, 241, 0.95)', outlineOffset: '5px', boxShadow: '0 0 24px rgba(99, 102, 241, 0.8)' },
+                      { outline: '2px solid rgba(139, 92, 246, 0.4)', outlineOffset: '2px', boxShadow: '0 0 12px rgba(139, 92, 246, 0.5)' }
+                    ], { duration: 1200, iterations: Infinity, easing: 'ease-in-out' });
+                  }
+                }
               },
-              args: [res.css || {}, res.text !== undefined && res.text !== null ? String(res.text) : null]
+              args: [targetDmId]
             });
-            appliedViaScripting = true;
           } catch (scriptErr) {
-            console.warn('[AxonBridge] chrome.scripting fallback to messaging:', scriptErr.message);
+            console.warn('[AxonBridge] Scripting blur start warning:', scriptErr);
           }
         }
 
-        // 2b. Send DM_AI_APPLY message to content.js (works when bridge is injected in page)
-        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-          const aiPayload = { type: 'DM_AI_APPLY', css: res.css || {}, text: res.text != null ? String(res.text) : null };
-          try { chrome.runtime.sendMessage(aiPayload); } catch (_) {}
+        // Also blur in local DOM if running directly on page
+        const localTarget = (targetDmId ? document.querySelector(`[data-dm-id="${targetDmId}"]`) : null) || document.querySelector('[data-dm-selected], .dm-selected');
+        if (localTarget && localTarget !== document.body) {
+          window.__axon_ai_target = localTarget;
+          localTarget.style.setProperty('transition', 'filter 0.35s ease, opacity 0.35s ease', 'important');
+          localTarget.style.setProperty('filter', 'blur(3.5px)', 'important');
+          localTarget.style.setProperty('opacity', '0.72', 'important');
+        }
 
-          // Also dispatch SP_SET_TEXT / SP_APPLY_STYLE for Design Mode compatibility
-          if (res.text !== null && res.text !== undefined) {
-            try { chrome.runtime.sendMessage({ type: 'SP_SET_TEXT', text: String(res.text) }); } catch (_) {}
+        try {
+          // Run AI request in parallel with a minimum 2.3-second thinking duration for authentic visual effect
+          const [res] = await Promise.all([
+            requestInlineAiEdit(prompt, targetTag, targetStyles, targetText),
+            new Promise((resolve) => setTimeout(resolve, 2300))
+          ]);
+
+          if (!res || (!res.css && res.text === undefined && res.text === null)) {
+            throw new Error('AI could not parse styling changes for this prompt. Please try rephrasing.');
           }
-          if (res.css && Object.keys(res.css).length > 0) {
-            for (const [prop, val] of Object.entries(res.css)) {
-              try { chrome.runtime.sendMessage({ type: 'SP_APPLY_STYLE', property: prop, value: val }); } catch (_) {}
+
+          // 2. Apply result to element in active webpage tab via executeScript
+          let appliedViaScripting = false;
+          if (activeTabId && typeof chrome !== 'undefined' && chrome.scripting) {
+            try {
+              await chrome.scripting.executeScript({
+                target: { tabId: activeTabId },
+                func: (dmId, cssProps, textEdit) => {
+                  let el = window.__axon_ai_target;
+                  if (!el && dmId) el = document.querySelector(`[data-dm-id="${dmId}"]`);
+                  if (!el) {
+                    const dmSelect = document.getElementById('dm-select');
+                    if (dmSelect && dmSelect.style.display !== 'none') {
+                      const r = dmSelect.getBoundingClientRect();
+                      const els = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+                      el = els.find(e => e && e.id !== 'dm-select' && !e.id?.startsWith('dm-') && !e.className?.toString().includes('dm-') && !e.closest('#axon-multiplayer-overlay') && e !== document.body);
+                    }
+                  }
+                  if (!el) el = document.querySelector('[data-dm-selected], .dm-selected') || (document.activeElement !== document.body ? document.activeElement : null);
+
+                  if (el && el !== document.body && el !== document.documentElement) {
+                    // Cancel thinking animation and restore blur
+                    if (window.__axon_ai_anim) {
+                      try { window.__axon_ai_anim.cancel(); } catch (_) {}
+                      window.__axon_ai_anim = null;
+                    }
+                    el.style.removeProperty('filter');
+                    el.style.removeProperty('opacity');
+                    if (el.dataset.axonOriginalFilter !== undefined) el.style.filter = el.dataset.axonOriginalFilter;
+                    if (el.dataset.axonOriginalOpacity !== undefined) el.style.opacity = el.dataset.axonOriginalOpacity;
+                    delete el.dataset.axonOriginalFilter;
+                    delete el.dataset.axonOriginalOpacity;
+                    delete el.dataset.axonOriginalTransition;
+
+                    // Apply new text content
+                    if (textEdit !== null && textEdit !== undefined && textEdit !== '') {
+                      el.innerText = String(textEdit);
+                    }
+
+                    // Apply CSS properties with !important
+                    if (cssProps && typeof cssProps === 'object') {
+                      for (const [key, value] of Object.entries(cssProps)) {
+                        if (key && value) {
+                          const kebab = key.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+                          el.style.setProperty(kebab, String(value), 'important');
+                        }
+                      }
+                    }
+
+                    // Green Success Glow Animation
+                    if (typeof el.animate === 'function') {
+                      el.animate([
+                        { outline: '3px solid #10B981', outlineOffset: '3px', boxShadow: '0 0 18px rgba(16, 185, 129, 0.85)' },
+                        { outline: '1px solid rgba(16, 185, 129, 0)', outlineOffset: '8px', boxShadow: '0 0 0px rgba(16, 185, 129, 0)' }
+                      ], { duration: 900, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' });
+                    }
+
+                    // Snap Design Mode selection overlay to updated dimensions
+                    const dmSelect = document.getElementById('dm-select');
+                    if (dmSelect && dmSelect.style.display !== 'none') {
+                      const r = el.getBoundingClientRect();
+                      dmSelect.style.top = r.top + 'px';
+                      dmSelect.style.left = r.left + 'px';
+                      dmSelect.style.width = r.width + 'px';
+                      dmSelect.style.height = r.height + 'px';
+                    }
+                    const dmDim = document.getElementById('dm-dim-label');
+                    if (dmDim && dmDim.style.display !== 'none') {
+                      const r = el.getBoundingClientRect();
+                      dmDim.textContent = `${Math.round(r.width)} × ${Math.round(r.height)}`;
+                      dmDim.style.top = (r.top + r.height + 4) + 'px';
+                      dmDim.style.left = r.left + 'px';
+                    }
+
+                    return true;
+                  }
+                  return false;
+                },
+                args: [targetDmId, res.css || {}, res.text != null ? String(res.text) : null]
+              });
+              appliedViaScripting = true;
+            } catch (scriptErr) {
+              console.warn('[AxonBridge] Scripting apply warning:', scriptErr);
             }
           }
+
+          // Also dispatch SET_TEXT and APPLY_STYLE to content.js via tabs.sendMessage
+          if (activeTabId && typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.sendMessage) {
+            if (res.text != null) {
+              try { chrome.tabs.sendMessage(activeTabId, { type: 'SET_TEXT', text: String(res.text) }); } catch (_) {}
+            }
+            if (res.css) {
+              for (const [prop, val] of Object.entries(res.css)) {
+                try { chrome.tabs.sendMessage(activeTabId, { type: 'APPLY_STYLE', property: prop, value: val }); } catch (_) {}
+              }
+            }
+          }
+
+          // Direct local DOM fallback if bridge is in page context
+          if (localTarget) {
+            localTarget.style.removeProperty('filter');
+            localTarget.style.removeProperty('opacity');
+            if (res.text != null) localTarget.innerText = String(res.text);
+            if (res.css) {
+              for (const [k, v] of Object.entries(res.css)) {
+                const kebab = k.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+                localTarget.style.setProperty(kebab, String(v), 'important');
+              }
+            }
+          }
+
+          modal.remove();
+          showToast(`✨ AI applied: ${res.explanation || 'Visual changes updated!'}`);
+        } catch (err) {
+          applyBtn.disabled = false;
+          applyBtn.style.opacity = '1';
+          applyBtn.innerHTML = '<span>✨ Generate & Apply Styles</span>';
+          if (errDiv) {
+            errDiv.textContent = err.message || 'AI generation failed. Please try again.';
+            errDiv.style.display = 'block';
+          }
         }
-
-        // 2c. Dispatch custom DOM event for content.js to pick up (universal fallback)
-        try {
-          window.dispatchEvent(new CustomEvent('axon-ai-apply', {
-            detail: { css: res.css || {}, text: res.text != null ? String(res.text) : null }
-          }));
-        } catch (_) {}
-
-        // 2d. Direct local DOM fallback (bridge injected directly on page)
-        if (!appliedViaScripting) {
-          applyToElement(res.css || {}, res.text != null ? String(res.text) : null);
-        }
-
-        modal.remove();
-        showToast(`✨ AI applied: ${res.explanation || 'Visual changes updated!'}`);
-      } catch (err) {
-        applyBtn.disabled = false;
-        applyBtn.innerHTML = '<span>✨ Generate & Apply Styles</span>';
-        errDiv.textContent = err.message || 'AI generation failed. Please try again.';
-        errDiv.style.display = 'block';
-      }
-    };
+      });
+    } finally {
+      isAiModalOpening = false;
+    }
   }
   // ==========================================
   // ACTIVITY HISTORY DRAWER

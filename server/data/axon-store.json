@@ -1551,8 +1551,8 @@
   ],
   "integrations": {
     "github": {
-      "connected": false,
-      "org": "",
+      "connected": true,
+      "org": "shreyas04venom",
       "accountType": "user",
       "appInstalled": false,
       "repositories": [],
@@ -1560,7 +1560,7 @@
         "repo",
         "workflow"
       ],
-      "lastSync": "2026-09-28T16:00:00.000Z"
+      "lastSync": "2026-10-11T04:56:16.406Z"
     },
     "vercel": {
       "connected": false,

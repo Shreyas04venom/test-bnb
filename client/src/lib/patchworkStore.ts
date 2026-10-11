@@ -1181,7 +1181,15 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
       },
 
       updateIntegrations: (updater) => {
-        set((state) => ({ integrations: updater(state.integrations) }));
+        set((state) => {
+          const updated = updater(state.integrations);
+          fetch('/api/integrations', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updated),
+          }).catch(() => {});
+          return { integrations: updated };
+        });
       },
 
       updateMyPresence: async (partial: Partial<RealtimePresence>) => {

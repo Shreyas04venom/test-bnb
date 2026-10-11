@@ -1705,21 +1705,92 @@ patchworkApiRouter.get('/conflicts', (_req: Request, res: Response) => {
 // ==========================================
 // 10. REAL GIT COMMIT & PUSH PIPELINE (/api/extension/commit)
 // ==========================================
+
+// GET /api/extension/github-status -> Check if GitHub is connected
+patchworkApiRouter.get('/extension/github-status', (_req: Request, res: Response) => {
+  const store = getStore();
+  const project = store.projects.find((p) => p.repositoryName?.includes('test-bnb')) || store.projects[0] || {
+    id: 'proj-live',
+    name: 'test-bnb',
+    repositoryName: 'Shreyas04venom/test-bnb',
+    repositoryUrl: 'https://github.com/Shreyas04venom/test-bnb',
+    defaultBranch: 'main',
+    productionUrl: 'https://bnb-gamma-red.vercel.app',
+  };
+
+  const isConnected = Boolean(store.integrations?.github?.connected);
+  res.json({
+    success: true,
+    connected: isConnected,
+    org: store.integrations?.github?.org || store.currentUser?.githubUsername || 'Shreyas04venom',
+    repositoryName: project.repositoryName || 'Shreyas04venom/test-bnb',
+    repositoryUrl: project.repositoryUrl || 'https://github.com/Shreyas04venom/test-bnb',
+    defaultBranch: project.defaultBranch || 'main',
+    productionUrl: project.productionUrl || 'https://bnb-gamma-red.vercel.app',
+    lastSync: store.integrations?.github?.lastSync || 'Just now',
+  });
+});
+
+// POST /api/extension/github-connect -> Connect GitHub integration
+patchworkApiRouter.post('/extension/github-connect', (req: Request, res: Response) => {
+  const store = getStore();
+  const { connected = true, org } = req.body || {};
+  store.integrations.github.connected = Boolean(connected);
+  store.integrations.github.org = org || store.integrations.github.org || store.currentUser.githubUsername || 'Shreyas04venom';
+  store.integrations.github.lastSync = new Date().toISOString();
+  saveStore();
+  res.json({
+    success: true,
+    connected: store.integrations.github.connected,
+    message: store.integrations.github.connected ? 'GitHub connected successfully to Axon workspace' : 'GitHub disconnected',
+    github: store.integrations.github,
+    repositoryUrl: 'https://github.com/Shreyas04venom/test-bnb',
+    deployedUrl: 'https://bnb-gamma-red.vercel.app',
+  });
+});
+
+// GET & PATCH /api/integrations -> Global Integrations Management
+patchworkApiRouter.get('/integrations', (_req: Request, res: Response) => {
+  const store = getStore();
+  res.json({ success: true, integrations: store.integrations });
+});
+
+patchworkApiRouter.patch('/integrations', (req: Request, res: Response) => {
+  const store = getStore();
+  const updates = req.body || {};
+  store.integrations = { ...store.integrations, ...updates };
+  saveStore();
+  res.json({ success: true, integrations: store.integrations });
+});
+
 patchworkApiRouter.post('/extension/commit', (req: Request, res: Response) => {
   const store = getStore();
   const { projectId, patchId, files, commitMessage, branch, cssContent } = req.body || {};
 
+  // 0. Enforce GitHub connection requirement: Git Push ONLY works when GitHub is connected!
+  const isGithubConnected = Boolean(store.integrations?.github?.connected);
+  if (!isGithubConnected) {
+    return res.status(400).json({
+      success: false,
+      githubConnected: false,
+      error: 'GitHub is not connected! Git Push only works when GitHub is connected.',
+      message: 'Please link your GitHub account in Axon or click "Connect GitHub" in the extension.',
+    });
+  }
+
   const project = store.projects.find((p) => p.id === projectId) || store.projects[0] || {
     id: 'proj-live',
-    name: 'Production Web App',
-    slug: 'prod-web',
-    productionUrl: 'http://localhost:3000',
+    name: 'test-bnb',
+    slug: 'test-bnb',
+    productionUrl: 'https://bnb-gamma-red.vercel.app',
     framework: 'React (Vite)',
     defaultBranch: 'main',
     repositoryName: 'Shreyas04venom/test-bnb',
+    repositoryUrl: 'https://github.com/Shreyas04venom/test-bnb',
   };
 
   const finalBranch = branch || project.defaultBranch || 'main';
+  const cleanCommitMsg = (commitMessage && commitMessage.trim() ? commitMessage.trim() : 'm').replace(/"/g, '\\"');
   const targetPatchId = patchId || `PW-${store.patches.length + 101}`;
   const versionTag = `v1.${store.versions.length + 1}.0`;
   const deploymentId = `DEP-${Math.floor(100 + Math.random() * 900)}`;
@@ -1747,58 +1818,53 @@ patchworkApiRouter.post('/extension/commit', (req: Request, res: Response) => {
     console.warn('[Extension Commit FS Warning]', fsErr);
   }
 
-  // 2. Execute Real Git Pipeline: git add ., git commit -m "...", git push origin main
+  // 2. Execute Real Git Pipeline: git add ., git commit -m "m", git push -u origin main
   let realCommitSha = '';
   let fullCommitSha = '';
   const gitStepLogs: string[] = [];
   let pushSuccess = false;
 
   try {
-    // A. git add -A
-    execSync('git add -A', { cwd: process.cwd(), encoding: 'utf-8', timeout: 15000 });
-    gitStepLogs.push('git add -A (visual tokens & overrides staged)');
+    // A. git add .
+    const addOut = execSync('git add .', { cwd: process.cwd(), encoding: 'utf-8', timeout: 20000 });
+    gitStepLogs.push(`> git add . -> Staged all changes ${addOut ? `(${addOut.trim()})` : 'successfully'}`);
 
-    // B. git commit -m "..."
-    const cleanCommitMsg = (commitMessage || `feat(visual): style overrides applied via Axon Chrome Extension [${versionTag}]`).replace(/"/g, '\\"');
+    // B. git commit -m "m"
     try {
-      execSync(`git commit -m "${cleanCommitMsg}"`, {
+      const commitOut = execSync(`git commit -m "${cleanCommitMsg}"`, {
         cwd: process.cwd(),
         encoding: 'utf-8',
-        timeout: 15000,
+        timeout: 20000,
       });
-      gitStepLogs.push(`git commit -m "${cleanCommitMsg}"`);
+      gitStepLogs.push(`> git commit -m "${cleanCommitMsg}" -> ${commitOut ? commitOut.trim() : 'Commit recorded'}`);
     } catch (cErr: any) {
-      // If nothing modified to commit, create an empty commit to record version in Git history
+      // If nothing modified to commit, allow empty commit to advance version and push
       if (cErr.stdout?.includes('nothing to commit') || cErr.message?.includes('nothing to commit')) {
-        execSync(`git commit --allow-empty -m "${cleanCommitMsg}"`, {
+        const emptyOut = execSync(`git commit --allow-empty -m "${cleanCommitMsg}"`, {
           cwd: process.cwd(),
           encoding: 'utf-8',
-          timeout: 15000,
+          timeout: 20000,
         });
-        gitStepLogs.push(`git commit --allow-empty -m "${cleanCommitMsg}"`);
+        gitStepLogs.push(`> git commit --allow-empty -m "${cleanCommitMsg}" -> ${emptyOut ? emptyOut.trim() : 'Created version marker'}`);
       } else {
         throw cErr;
       }
     }
 
-    // C. Get real commit SHA from git rev-parse HEAD
+    // C. git rev-parse HEAD
     realCommitSha = execSync('git rev-parse --short HEAD', { cwd: process.cwd(), encoding: 'utf-8' }).trim();
     fullCommitSha = execSync('git rev-parse HEAD', { cwd: process.cwd(), encoding: 'utf-8' }).trim();
-    gitStepLogs.push(`HEAD resolved: ${realCommitSha} (${fullCommitSha})`);
+    gitStepLogs.push(`> HEAD resolved: ${realCommitSha} (${fullCommitSha})`);
 
-    // D. git push origin <branch>
-    try {
-      const pushRes = execSync(`git push origin ${finalBranch}`, {
-        cwd: process.cwd(),
-        encoding: 'utf-8',
-        timeout: 25000,
-      });
-      pushSuccess = true;
-      gitStepLogs.push(`git push origin ${finalBranch} OK: ${pushRes?.trim() || 'Synchronized'}`);
-    } catch (pErr: any) {
-      console.warn('[Git Push Remote Warning]', pErr.message);
-      gitStepLogs.push(`git push origin ${finalBranch} notice: ${pErr.message?.slice(0, 100)}`);
-    }
+    // D. git push -u origin <branch>
+    const pushRes = execSync(`git push -u origin ${finalBranch}`, {
+      cwd: process.cwd(),
+      encoding: 'utf-8',
+      timeout: 45000,
+    });
+    pushSuccess = true;
+    gitStepLogs.push(`> git push -u origin ${finalBranch} -> Synchronized with GitHub (${pushRes ? pushRes.trim() : 'Everything up-to-date'})`);
+    gitStepLogs.push(`> Deployed link updating in real-time: https://bnb-gamma-red.vercel.app`);
   } catch (gitErr: any) {
     console.error('[Git Pipeline Error]', gitErr);
     try {
@@ -1808,7 +1874,16 @@ patchworkApiRouter.post('/extension/commit', (req: Request, res: Response) => {
       realCommitSha = Math.random().toString(16).substring(2, 9);
       fullCommitSha = realCommitSha.repeat(5).substring(0, 40);
     }
-    gitStepLogs.push(`Git fallback executed [${realCommitSha}]`);
+    gitStepLogs.push(`> Git pipeline exception: ${gitErr.message?.slice(0, 150)}`);
+
+    if (!pushSuccess) {
+      return res.status(500).json({
+        success: false,
+        error: `Git command failed: ${gitErr.stderr || gitErr.message}`,
+        stepLogs: gitStepLogs,
+        commitSha: realCommitSha,
+      });
+    }
   }
 
   // 3. Staged files summary
@@ -1972,6 +2047,9 @@ patchworkApiRouter.post('/extension/commit', (req: Request, res: Response) => {
     branch: finalBranch,
     version: versionTag,
     deploymentId,
+    commitMessage: cleanCommitMsg,
+    deployedUrl: project.productionUrl || 'https://bnb-gamma-red.vercel.app',
+    repositoryUrl: project.repositoryUrl || 'https://github.com/Shreyas04venom/test-bnb',
     verification: verificationRun,
     patch,
     pipelineSteps: gitStepLogs,
