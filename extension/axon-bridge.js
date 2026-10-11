@@ -28,6 +28,9 @@
   let activeTeammates = [];
   let presenceInterval = null;
   let webAuthCheckInterval = null;
+  // Stale cursor cache: { [userId]: { ...teammateData, _lastSeen: timestamp, _stale: bool } }
+  const _teammateCache = new Map();
+
 
   // ==========================================
   // Storage & State Sync
@@ -359,9 +362,47 @@
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.presence)) {
-          activeTeammates = json.presence.filter(
-            (t) => t.userId && t.userId !== myId
-          );
+          const now = Date.now();
+
+          // Update cache with fresh data from server (teammates currently online)
+          json.presence
+            .filter((t) => t.userId && t.userId !== myId)
+            .forEach((t) => {
+              _teammateCache.set(t.userId, {
+                ...t,
+                _lastSeen: now,          // freshly seen right now
+                _stale: false,           // actively present
+                _lastRoute: t.route || window.location.href,
+              });
+            });
+
+          // Mark anyone NOT returned by the server as potentially stale
+          for (const [uid, cached] of _teammateCache) {
+            const freshlyReported = json.presence.some((t) => t.userId === uid);
+            if (!freshlyReported) {
+              cached._stale = true;      // they navigated away or went offline
+            }
+          }
+
+          // Build activeTeammates: fresh ones on same page + stale ones within 60s
+          activeTeammates = [];
+          for (const [uid, cached] of _teammateCache) {
+            const age = now - cached._lastSeen;
+            if (age > 60000) {
+              // Expired — remove from cache so cursor disappears
+              _teammateCache.delete(uid);
+              continue;
+            }
+            const onSamePage = (cached._lastRoute || '') === window.location.href;
+            if (!cached._stale) {
+              // Actively present AND on same URL → show live cursor
+              if (onSamePage) activeTeammates.push({ ...cached });
+            } else {
+              // Stale (navigated away) → show frozen cursor at last known position for up to 60s
+              activeTeammates.push({ ...cached, _frozen: true });
+            }
+          }
+
           renderTeammates();
         }
       }
@@ -369,6 +410,7 @@
       // ignore network blip
     }
   }
+
 
   function startPresenceSync() {
     if (presenceInterval) clearInterval(presenceInterval);
@@ -760,7 +802,7 @@ Return ONLY a valid JSON object with format:
 
     for (let attempt = 0; attempt < EMBEDDED_GEMINI_KEYS.length; attempt++) {
       const activeKey = EMBEDDED_GEMINI_KEYS[(currentKeyRotationIdx + attempt) % EMBEDDED_GEMINI_KEYS.length];
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${activeKey}`;
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${activeKey}`;
       try {
         const resp = await fetch(endpoint, {
           method: 'POST',
@@ -1351,20 +1393,26 @@ Return ONLY a valid JSON object with format:
 
     activeTeammates.slice(0, 3).forEach((t) => {
       const bubble = document.createElement('div');
-      bubble.title = `${t.userName} (${t.role || 'teammate'}) is active on route: ${t.route || '/'}`;
+      const isStale = t._frozen === true;
+      const title = isStale
+        ? `${t.userName} left this page — cursor visible for ~60s`
+        : `${t.userName} (${t.role || 'teammate'}) is active on route: ${t.route || '/'}`;
+      bubble.title = title;
       bubble.style.cssText = `
         width: 17px;
         height: 17px;
         border-radius: 50%;
-        background: ${t.userColor || '#6366F1'};
+        background: ${isStale ? '#475569' : (t.userColor || '#6366F1')};
         color: #FFFFFF;
         font-size: 9px;
         font-weight: bold;
         display: flex;
         align-items: center;
         justify-content: center;
-        border: 1.5px solid #120F26;
+        border: 1.5px solid ${isStale ? 'rgba(148,163,184,0.4)' : '#120F26'};
         margin-left: -4px;
+        opacity: ${isStale ? '0.55' : '1'};
+        transition: opacity 0.3s ease;
       `;
       bubble.textContent = (t.userName || 'U')[0].toUpperCase();
       stack.appendChild(bubble);
@@ -1390,6 +1438,7 @@ Return ONLY a valid JSON object with format:
       stack.appendChild(more);
     }
   }
+
 
   function updateUI() {
     const indicator = document.getElementById('axon-status-indicator');
@@ -1716,8 +1765,57 @@ Return ONLY a valid JSON object with format:
           new Promise((resolve) => setTimeout(resolve, 2200))
         ]);
 
-        // 2. Direct injection into active tab via chrome.scripting: smoothly remove blur & apply real changes!
-        if (activeTabId) {
+        // Helper: apply styles + text to a single element in the PAGE context
+        const applyToElement = (cssProps, textEdit) => {
+          const el = window.__axon_ai_target || (() => {
+            const dmSelect = document.getElementById('dm-select');
+            if (dmSelect) {
+              const r = dmSelect.getBoundingClientRect();
+              const els = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+              return els.find(e => e.id !== 'dm-select' && !e.id?.startsWith('dm-') && !e.className?.toString().includes('dm-'));
+            }
+            return document.querySelector('[data-dm-selected], .dm-selected, [data-dm-id]') || document.activeElement;
+          })();
+
+          if (el && el !== document.body && el !== document.documentElement) {
+            if (window.__axon_ai_anim) {
+              try { window.__axon_ai_anim.cancel(); } catch (_) {}
+            }
+            // Smoothly remove blur effect
+            el.style.removeProperty('filter');
+            el.style.removeProperty('opacity');
+            if (el.dataset.dmOriginalFilter !== undefined) el.style.filter = el.dataset.dmOriginalFilter || '';
+            if (el.dataset.dmOriginalOpacity !== undefined) el.style.opacity = el.dataset.dmOriginalOpacity || '';
+            delete el.dataset.dmOriginalFilter;
+            delete el.dataset.dmOriginalOpacity;
+
+            // Apply text
+            if (textEdit !== null && textEdit !== undefined && textEdit !== '') {
+              el.innerText = textEdit;
+            }
+
+            // Apply CSS props
+            if (cssProps && typeof cssProps === 'object') {
+              for (const [key, value] of Object.entries(cssProps)) {
+                if (key && value) el.style.setProperty(key, value, 'important');
+              }
+            }
+
+            // Success pulse
+            if (typeof el.animate === 'function') {
+              el.animate([
+                { outline: '3px solid #10B981', outlineOffset: '3px' },
+                { outline: '1px solid rgba(16, 185, 129, 0)', outlineOffset: '8px' }
+              ], { duration: 900, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' });
+            }
+            return true;
+          }
+          return false;
+        };
+
+        // 2a. Try chrome.scripting (works when bridge = sidepanel/popup context)
+        let appliedViaScripting = false;
+        if (activeTabId && typeof chrome !== 'undefined' && chrome.scripting) {
           try {
             await chrome.scripting.executeScript({
               target: { tabId: activeTabId },
@@ -1729,95 +1827,75 @@ Return ONLY a valid JSON object with format:
                     const els = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2);
                     return els.find(e => e.id !== 'dm-select' && !e.id?.startsWith('dm-') && !e.className?.toString().includes('dm-'));
                   }
-                  return document.querySelector('[data-dm-selected], .dm-selected') || document.activeElement;
+                  return document.querySelector('[data-dm-selected], .dm-selected, [data-dm-id]') || document.activeElement;
                 })();
 
                 if (el && el !== document.body && el !== document.documentElement) {
-                  if (window.__axon_ai_anim) {
-                    try { window.__axon_ai_anim.cancel(); } catch (_) {}
-                  }
-
-                  // Smoothly remove blur effect
+                  if (window.__axon_ai_anim) { try { window.__axon_ai_anim.cancel(); } catch (_) {} }
                   el.style.removeProperty('filter');
                   el.style.removeProperty('opacity');
-                  if (el.dataset.dmOriginalFilter) el.style.filter = el.dataset.dmOriginalFilter;
-                  if (el.dataset.dmOriginalOpacity) el.style.opacity = el.dataset.dmOriginalOpacity;
+                  if (el.dataset.dmOriginalFilter !== undefined) el.style.filter = el.dataset.dmOriginalFilter || '';
+                  if (el.dataset.dmOriginalOpacity !== undefined) el.style.opacity = el.dataset.dmOriginalOpacity || '';
                   delete el.dataset.dmOriginalFilter;
                   delete el.dataset.dmOriginalOpacity;
-
-                  // 1. Text & Integer updates
-                  if (textEdit !== null && textEdit !== undefined) {
-                    el.innerText = textEdit;
-                  }
-
-                  // 2. CSS property updates
+                  if (textEdit !== null && textEdit !== undefined && textEdit !== '') el.innerText = textEdit;
                   if (cssProps) {
                     for (const [key, value] of Object.entries(cssProps)) {
-                      el.style.setProperty(key, value, 'important');
+                      if (key && value) el.style.setProperty(key, value, 'important');
                     }
                   }
-
-                  // 3. Crisp success completion pulse (emerald green ring)
                   if (typeof el.animate === 'function') {
                     el.animate([
                       { outline: '3px solid #10B981', outlineOffset: '3px' },
                       { outline: '1px solid rgba(16, 185, 129, 0)', outlineOffset: '8px' }
                     ], { duration: 900, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' });
                   }
+                  return true;
                 }
+                return false;
               },
               args: [res.css || {}, res.text !== undefined && res.text !== null ? String(res.text) : null]
             });
+            appliedViaScripting = true;
           } catch (scriptErr) {
-            console.warn('[AxonBridge] Scripting execution warning:', scriptErr);
+            console.warn('[AxonBridge] chrome.scripting fallback to messaging:', scriptErr.message);
           }
         }
 
-        // 3. Dispatch to Design Mode background / content script
+        // 2b. Send DM_AI_APPLY message to content.js (works when bridge is injected in page)
         if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-          // If text was modified, dispatch SP_SET_TEXT
-          if (res.text !== null && res.text !== undefined) {
-            try {
-              chrome.runtime.sendMessage({
-                type: 'SP_SET_TEXT',
-                text: String(res.text)
-              });
-            } catch (_) {}
-          }
+          const aiPayload = { type: 'DM_AI_APPLY', css: res.css || {}, text: res.text != null ? String(res.text) : null };
+          try { chrome.runtime.sendMessage(aiPayload); } catch (_) {}
 
-          // If CSS styles were generated, dispatch SP_APPLY_STYLE for each property
+          // Also dispatch SP_SET_TEXT / SP_APPLY_STYLE for Design Mode compatibility
+          if (res.text !== null && res.text !== undefined) {
+            try { chrome.runtime.sendMessage({ type: 'SP_SET_TEXT', text: String(res.text) }); } catch (_) {}
+          }
           if (res.css && Object.keys(res.css).length > 0) {
             for (const [prop, val] of Object.entries(res.css)) {
-              try {
-                chrome.runtime.sendMessage({
-                  type: 'SP_APPLY_STYLE',
-                  property: prop,
-                  value: val
-                });
-              } catch (_) {}
+              try { chrome.runtime.sendMessage({ type: 'SP_APPLY_STYLE', property: prop, value: val }); } catch (_) {}
             }
           }
         }
 
-        // 4. If running inside webpage document directly, apply to local DOM
-        const localEl = document.querySelector('[data-dm-selected]') || document.querySelector('.dm-selected');
-        if (localEl) {
-          if (res.css) {
-            Object.entries(res.css).forEach(([prop, val]) => {
-              localEl.style.setProperty(prop, val, 'important');
-            });
-          }
-          if (res.text !== null && res.text !== undefined) {
-            localEl.innerText = String(res.text);
-          }
+        // 2c. Dispatch custom DOM event for content.js to pick up (universal fallback)
+        try {
+          window.dispatchEvent(new CustomEvent('axon-ai-apply', {
+            detail: { css: res.css || {}, text: res.text != null ? String(res.text) : null }
+          }));
+        } catch (_) {}
+
+        // 2d. Direct local DOM fallback (bridge injected directly on page)
+        if (!appliedViaScripting) {
+          applyToElement(res.css || {}, res.text != null ? String(res.text) : null);
         }
 
         modal.remove();
         showToast(`✨ AI applied: ${res.explanation || 'Visual changes updated!'}`);
       } catch (err) {
         applyBtn.disabled = false;
-        applyBtn.textContent = '✨ Generate & Apply Styles';
-        errDiv.textContent = err.message || 'AI generation failed.';
+        applyBtn.innerHTML = '<span>✨ Generate & Apply Styles</span>';
+        errDiv.textContent = err.message || 'AI generation failed. Please try again.';
         errDiv.style.display = 'block';
       }
     };
