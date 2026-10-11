@@ -199,10 +199,38 @@
 
     try {
       // Check if user entered an existing raw session token directly
-      if (cleanCode.startsWith('axon_ext_tok_') || cleanCode.startsWith('Bearer ') || cleanCode.startsWith('ext-sess-')) {
+      if (cleanCode.startsWith('axon_ext_tok_') || cleanCode.startsWith('Bearer ') || cleanCode.startsWith('ext-sess-') || cleanCode.length > 20) {
         const rawToken = cleanCode.replace(/^Bearer\s+/i, '');
         currentAuth.token = rawToken;
         currentAuth.serverUrl = serverUrl;
+
+        try {
+          const verifyRes = await fetch(`${serverUrl}/api/extension/session/me`, {
+            headers: { Authorization: `Bearer ${rawToken}` },
+          });
+          if (verifyRes.ok) {
+            const vJson = await verifyRes.json();
+            if (vJson.success) {
+              if (vJson.user) currentAuth.user = vJson.user;
+              if (vJson.workspace) currentAuth.workspace = vJson.workspace;
+              if (Array.isArray(vJson.projects) && vJson.projects.length > 0) {
+                currentAuth.projects = vJson.projects;
+                currentAuth.activeProjectId = vJson.activeProjectId || vJson.projects[0].id;
+              }
+            }
+          }
+        } catch (_) {}
+
+        if (!currentAuth.user) {
+          const randId = 'usr-' + Math.random().toString(36).substring(2, 9);
+          currentAuth.user = {
+            id: randId,
+            name: 'Collaborator',
+            cursorColor: '#EC4899',
+            role: 'developer',
+          };
+        }
+
         await fetchProjects();
         await saveAuth();
         startPresenceSync();
@@ -210,7 +238,7 @@
         return {
           ok: true,
           workspace: currentAuth.workspace || { name: 'Axon Workspace' },
-          user: currentAuth.user || { name: 'Authorized User' },
+          user: currentAuth.user,
         };
       }
 
@@ -279,6 +307,21 @@
     showToast('Session disconnected.');
   }
 
+  // Track local window mouse coordinates
+  let bridgeMouse = { x: 50, y: 50, isClicking: false, lastClickTime: 0 };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('mousemove', (e) => {
+      bridgeMouse.x = Math.round((e.clientX / window.innerWidth) * 100);
+      bridgeMouse.y = Math.round((e.clientY / window.innerHeight) * 100);
+    }, { passive: true });
+    window.addEventListener('mousedown', () => {
+      bridgeMouse.isClicking = true;
+      bridgeMouse.lastClickTime = Date.now();
+      syncPresence();
+      setTimeout(() => { bridgeMouse.isClicking = false; }, 350);
+    }, { passive: true });
+  }
+
   // ==========================================
   // Realtime Presence & Multiplayer
   // ==========================================
@@ -288,38 +331,38 @@
       const selectedEl = document.querySelector('[data-dm-selected]');
       const selectedTag = selectedEl ? (selectedEl.tagName.toLowerCase() + (selectedEl.className ? '.' + selectedEl.className.split(' ')[0] : '')) : '';
 
+      const myId = currentAuth.user?.id || 'usr-local-ext';
+
       const res = await fetch(`${currentAuth.serverUrl}/api/extension/presence`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${currentAuth.token}`,
+          'x-user-id': myId,
         },
         body: JSON.stringify({
-          userId: currentAuth.user?.id || 'ext-usr-local',
+          userId: myId,
           userName: currentAuth.user?.name || 'Extension Collaborator',
           userColor: currentAuth.user?.cursorColor || '#6366F1',
           userAvatar: currentAuth.user?.avatar || '',
           role: currentAuth.user?.role || 'developer',
-          projectId: currentAuth.activeProjectId || 'proj-live',
+          projectId: currentAuth.activeProjectId || (currentAuth.projects?.[0]?.id) || 'proj-live',
           route: window.location.href,
-          cursorX: 50,
-          cursorY: 50,
+          cursorX: bridgeMouse.x,
+          cursorY: bridgeMouse.y,
           selectedElement: selectedTag,
+          isClicking: bridgeMouse.isClicking,
+          lastClickTime: bridgeMouse.lastClickTime,
         }),
       });
 
       if (res.ok) {
         const json = await res.json();
-        // Also fetch active teammates list
-        const getRes = await fetch(`${currentAuth.serverUrl}/api/extension/presence`);
-        if (getRes.ok) {
-          const listJson = await getRes.json();
-          if (listJson.success && Array.isArray(listJson.presence)) {
-            activeTeammates = listJson.presence.filter(
-              (t) => t.userId !== (currentAuth.user?.id || 'ext-usr-local')
-            );
-            renderTeammates();
-          }
+        if (json.success && Array.isArray(json.presence)) {
+          activeTeammates = json.presence.filter(
+            (t) => t.userId && t.userId !== myId
+          );
+          renderTeammates();
         }
       }
     } catch {
@@ -330,7 +373,7 @@
   function startPresenceSync() {
     if (presenceInterval) clearInterval(presenceInterval);
     syncPresence();
-    presenceInterval = setInterval(syncPresence, 4000);
+    presenceInterval = setInterval(syncPresence, 350);
   }
 
   // ==========================================

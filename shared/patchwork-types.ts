@@ -254,11 +254,18 @@ export interface RealtimePresence {
   cursorColor: string;
   currentProject: string;
   currentRoute: string;
-  currentActivity: string;
+  currentActivity?: string;
   cursorX?: number;
   cursorY?: number;
-  selectedElement?: string;
-  lastSeenAt: string;
+  pageX?: number;
+  pageY?: number;
+  selectedElement?: string | null;
+  isClicking?: boolean;
+  lastClickTime?: number;
+  cursorPosition?: { x: number; y: number };
+  role?: string;
+  lastSeen?: string;
+  lastSeenAt?: string;
   status: 'online' | 'idle' | 'offline';
 }
 
@@ -318,6 +325,8 @@ export interface ExtensionSession {
   lastActiveAt: string;
   expiresAt: string;
   revokedAt?: string;
+  token?: string;
+  user?: any;
   deviceInfo?: string;
   version?: string;
   ipAddress?: string;

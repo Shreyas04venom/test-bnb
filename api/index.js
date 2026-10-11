@@ -2075,8 +2075,7 @@ function getActivePresence(projectId, route) {
     if (item.lastActiveAt < cutoff) {
       livePresence.delete(id);
     } else {
-      if (projectId && item.projectId !== projectId) continue;
-      if (route && item.route !== route) continue;
+      if (projectId && item.projectId && item.projectId !== projectId) continue;
       active.push(item);
     }
   }
@@ -3216,14 +3215,15 @@ patchworkApiRouter.post("/extension/pair", (_req, res) => {
   });
 });
 patchworkApiRouter.post("/extension/session", (req, res) => {
-  const { pairingCode, deviceName, browser, autoApprove } = req.body;
+  const { pairingCode, deviceName, browser, autoApprove, userId, email } = req.body;
   const store = getStore();
   let approved = false;
+  let codeRecord = null;
   if (autoApprove) {
     approved = true;
   } else if (pairingCode) {
-    const verified = verifyAndConsumePairingCode(pairingCode);
-    if (!verified) {
+    codeRecord = verifyAndConsumePairingCode(pairingCode);
+    if (!codeRecord) {
       return res.status(400).json({
         success: false,
         error: {
@@ -3237,14 +3237,38 @@ patchworkApiRouter.post("/extension/session", (req, res) => {
   if (!approved) {
     return res.status(400).json({ success: false, error: "Pairing code is required" });
   }
+  const targetUserId = userId || req.headers["x-user-id"]?.trim() || codeRecord?.userId || store.currentUser.id;
+  const targetEmail = email || req.headers["x-user-email"]?.trim();
+  let targetUser = null;
+  if (targetUserId === store.currentUser.id) {
+    targetUser = store.currentUser;
+  } else {
+    const collab = store.collaborators.find(
+      (c) => c.userId === targetUserId || targetEmail && c.user?.email?.toLowerCase() === targetEmail.toLowerCase()
+    );
+    if (collab) {
+      targetUser = collab.user;
+    } else {
+      targetUser = {
+        id: targetUserId,
+        name: "Collaborator",
+        email: targetEmail || "",
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(targetUserId)}`,
+        cursorColor: "#EC4899",
+        role: "developer"
+      };
+    }
+  }
   const token = `axon_ext_tok_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
   const newSession = {
     id: `ext-sess-${Date.now()}`,
-    userId: store.currentUser.id,
+    userId: targetUser.id,
     workspaceId: store.workspace.id,
     deviceName: deviceName || "Chrome Browser",
     browser: browser || "Chrome 129",
     tokenHash: `hash_${token.substring(0, 16)}...`,
+    token,
+    user: targetUser,
     permissions: [
       "read:projects",
       "write:patches",
@@ -3258,9 +3282,13 @@ patchworkApiRouter.post("/extension/session", (req, res) => {
   };
   store.extensionSessions.unshift(newSession);
   pushAudit("EXTENSION_PAIRED", {
-    metadata: { device: newSession.deviceName, browser: newSession.browser }
+    metadata: { device: newSession.deviceName, browser: newSession.browser, userId: targetUser.id }
   }, req);
   saveStore();
+  let userProjects = filterProjectsForUser(store.projects, targetUser.id, targetUser.email);
+  if (userProjects.length === 0 && store.projects.length > 0) {
+    userProjects = store.projects;
+  }
   res.json({
     success: true,
     session: newSession,
@@ -3271,8 +3299,8 @@ patchworkApiRouter.post("/extension/session", (req, res) => {
       id: store.workspace.id,
       name: store.workspace.name
     },
-    user: store.currentUser,
-    projects: filterProjectsForUser(store.projects, store.currentUser.id, store.currentUser.email).map((p) => ({
+    user: targetUser,
+    projects: userProjects.map((p) => ({
       id: p.id,
       name: p.name,
       slug: p.slug,
@@ -3281,6 +3309,69 @@ patchworkApiRouter.post("/extension/session", (req, res) => {
     }))
   });
 });
+var handleTokenVerify = (req, res) => {
+  const store = getStore();
+  const authHeader = req.headers["authorization"];
+  const bodyToken = req.body?.token;
+  const rawToken = (authHeader ? authHeader.replace(/^Bearer\s+/i, "").trim() : "") || bodyToken || req.query.token?.trim();
+  if (!rawToken) {
+    return res.status(401).json({ success: false, error: "Session token is required" });
+  }
+  const session = store.extensionSessions.find(
+    (s) => s.id === rawToken || s.token === rawToken || s.tokenHash.includes(rawToken.substring(0, 16))
+  );
+  let user = session?.user;
+  if (!user && session?.userId) {
+    if (session.userId === store.currentUser.id) {
+      user = store.currentUser;
+    } else {
+      const c = store.collaborators.find((m) => m.userId === session.userId);
+      user = c?.user;
+    }
+  }
+  if (!user) {
+    const isOwnerToken = rawToken.includes("owner") || rawToken === store.currentUser.id;
+    if (isOwnerToken) {
+      user = store.currentUser;
+    } else {
+      const colors = ["#EC4899", "#10B981", "#F59E0B", "#8B5CF6", "#06B6D4", "#3B82F6"];
+      let hash = 0;
+      for (let i = 0; i < rawToken.length; i++) hash = (hash << 5) - hash + rawToken.charCodeAt(i);
+      const color = colors[Math.abs(hash) % colors.length];
+      const anonId = `usr-${Math.abs(hash).toString(36).substring(0, 7)}`;
+      user = {
+        id: anonId,
+        name: `Collaborator ${anonId.substring(4, 7)}`,
+        email: `collab-${anonId}@axon.dev`,
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${anonId}`,
+        cursorColor: color,
+        role: "developer"
+      };
+    }
+  }
+  let userProjects = filterProjectsForUser(store.projects, user.id, user.email);
+  if (userProjects.length === 0 && store.projects.length > 0) {
+    userProjects = store.projects;
+  }
+  res.json({
+    success: true,
+    user,
+    workspace: {
+      id: store.workspace.id,
+      name: store.workspace.name
+    },
+    projects: userProjects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      productionUrl: p.productionUrl,
+      framework: p.framework
+    })),
+    activeProjectId: userProjects[0]?.id || store.projects[0]?.id || null
+  });
+};
+patchworkApiRouter.get("/extension/session/me", handleTokenVerify);
+patchworkApiRouter.post("/extension/verify-token", handleTokenVerify);
 patchworkApiRouter.get("/extension/sessions", (_req, res) => {
   const store = getStore();
   res.json({ success: true, sessions: store.extensionSessions });
@@ -3297,9 +3388,22 @@ patchworkApiRouter.delete("/extension/session/:id", (req, res) => {
 });
 patchworkApiRouter.get("/extension/projects", (req, res) => {
   const store = getStore();
-  const userId = req.query.userId?.trim() || req.headers["x-user-id"]?.trim() || req.query.user_id?.trim();
+  let userId = req.query.userId?.trim() || req.headers["x-user-id"]?.trim() || req.query.user_id?.trim();
   const email = req.query.email?.trim() || req.query.userEmail?.trim() || req.headers["x-user-email"]?.trim();
-  const userProjects = filterProjectsForUser(store.projects, userId, email);
+  const authHeader = req.headers["authorization"];
+  if (authHeader && !userId) {
+    const rawTok = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const session = store.extensionSessions.find(
+      (s) => s.id === rawTok || s.token === rawTok || s.tokenHash.includes(rawTok.substring(0, 16))
+    );
+    if (session) {
+      userId = session.userId;
+    }
+  }
+  let userProjects = filterProjectsForUser(store.projects, userId, email);
+  if (userProjects.length === 0 && store.projects.length > 0) {
+    userProjects = store.projects;
+  }
   res.json({
     success: true,
     projects: userProjects.map((p) => ({
@@ -3374,21 +3478,52 @@ patchworkApiRouter.post("/extension/projects/:id/patches", (req, res) => {
   });
 });
 patchworkApiRouter.post("/extension/presence", (req, res) => {
-  const { userId, userName, userColor, userAvatar, role, projectId, route, cursorX, cursorY, selectedElement } = req.body;
+  const {
+    userId,
+    userName,
+    userEmail,
+    userColor,
+    userAvatar,
+    role,
+    projectId,
+    route,
+    cursorX,
+    cursorY,
+    pageX,
+    pageY,
+    selectedElement,
+    activeTool,
+    isClicking,
+    lastClickTime
+  } = req.body;
+  const resolvedId = userId || req.headers["x-user-id"] || "anon";
+  const id = `pres-${resolvedId}`;
   recordPresence({
-    id: `pres-${userId || "anon"}`,
-    userId: userId || "usr-anonymous",
+    id,
+    userId: resolvedId,
     userName: userName || "Extension User",
+    userEmail: userEmail || "",
     userColor: userColor || "#6366F1",
-    userAvatar: userAvatar || "https://api.dicebear.com/7.x/initials/svg?seed=axon",
+    userAvatar: userAvatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userName || "axon")}`,
     role: role || "developer",
     projectId: projectId || "",
     route: route || "/",
     cursorX: typeof cursorX === "number" ? cursorX : 50,
     cursorY: typeof cursorY === "number" ? cursorY : 50,
-    selectedElement: selectedElement || ""
+    pageX: typeof pageX === "number" ? pageX : void 0,
+    pageY: typeof pageY === "number" ? pageY : void 0,
+    selectedElement: selectedElement || "",
+    activeTool: activeTool || "select",
+    isClicking: Boolean(isClicking),
+    lastClickTime: typeof lastClickTime === "number" ? lastClickTime : isClicking ? Date.now() : void 0
   });
-  res.json({ success: true, timestamp: Date.now() });
+  const active = getActivePresence(projectId);
+  res.json({
+    success: true,
+    presence: active,
+    onlineCount: active.length,
+    timestamp: Date.now()
+  });
 });
 patchworkApiRouter.get("/extension/presence", (req, res) => {
   const projectId = req.query.projectId?.trim() || void 0;

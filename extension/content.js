@@ -175,3 +175,494 @@ ${o(n.styleChanges)}`}return r===0&&!xe?`## Route: ${n.url}
   } catch(e) {}
 })();
 
+/* ============================================================
+ * AXON MULTIPLAYER ENGINE: Live Cursors, Clicks, Element Inspection
+ * ============================================================ */
+(function() {
+  'use strict';
+
+  var authSession = null;
+  var presenceTimer = null;
+  var lastSent = 0;
+  var myMouse = {
+    x: 50,
+    y: 50,
+    pageX: 0,
+    pageY: 0,
+    isClicking: false,
+    lastClickTime: 0,
+    selectedElement: '',
+  };
+  var otherTeammates = [];
+  var overlayContainer = null;
+  var cursorNodes = new Map();
+  var highlightNodes = new Map();
+  var hudElement = null;
+
+  var PALETTE = ['#6366F1', '#EC4899', '#10B981', '#F59E0B', '#8B5CF6', '#06B6D4', '#3B82F6', '#EF4444'];
+
+  function getUniqueColor(seed) {
+    if (!seed) return PALETTE[0];
+    var hash = 0;
+    for (var i = 0; i < seed.length; i++) hash = (hash << 5) - hash + seed.charCodeAt(i);
+    return PALETTE[Math.abs(hash) % PALETTE.length];
+  }
+
+  function getElementSelector(el) {
+    if (!el || el === document.body || el === document.documentElement) return '';
+    try {
+      if (el.id) return '#' + CSS.escape(el.id);
+      if (el.getAttribute && el.getAttribute('data-dm-id')) {
+        return '[data-dm-id="' + el.getAttribute('data-dm-id') + '"]';
+      }
+      var tag = el.tagName.toLowerCase();
+      if (el.className && typeof el.className === 'string') {
+        var firstClass = el.className.trim().split(/\s+/)[0];
+        if (firstClass && !firstClass.includes(':')) {
+          return tag + '.' + CSS.escape(firstClass);
+        }
+      }
+      return tag;
+    } catch (_) {
+      return el.tagName ? el.tagName.toLowerCase() : '';
+    }
+  }
+
+  function getStorageSession(callback) {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get('axon_auth_session', function(res) {
+        callback(res ? res.axon_auth_session : null);
+      });
+    } else {
+      try {
+        var raw = localStorage.getItem('axon_auth_session');
+        callback(raw ? JSON.parse(raw) : null);
+      } catch (_) {
+        callback(null);
+      }
+    }
+  }
+
+  function updateAuth(sess) {
+    if (!sess || !sess.token) {
+      authSession = null;
+      teardownMultiplayer();
+      return;
+    }
+
+    authSession = Object.assign({}, sess);
+    if (!authSession.serverUrl || authSession.serverUrl.includes('localhost') || authSession.serverUrl.includes('127.0.0.1')) {
+      // In web extension context, default to deployed production backend if localhost is unreachable
+      authSession.serverUrl = sess.serverUrl || 'https://bnb-gamma-red.vercel.app';
+    }
+    authSession.serverUrl = authSession.serverUrl.replace(/\/+$/, '');
+
+    // Ensure user has valid ID and distinct cursor color
+    if (!authSession.user) {
+      var randId = 'usr-' + Math.random().toString(36).substring(2, 9);
+      authSession.user = {
+        id: randId,
+        name: 'Collaborator',
+        cursorColor: getUniqueColor(randId),
+        role: 'developer',
+      };
+    } else {
+      if (!authSession.user.id) {
+        authSession.user.id = 'usr-' + Math.random().toString(36).substring(2, 9);
+      }
+      if (!authSession.user.cursorColor) {
+        authSession.user.cursorColor = getUniqueColor(authSession.user.id || authSession.user.name);
+      }
+    }
+
+    setupMultiplayer();
+  }
+
+  function setupMultiplayer() {
+    if (presenceTimer) clearInterval(presenceTimer);
+    injectOverlay();
+    injectHud();
+
+    // Start presence heartbeat loop (every 280ms for ultra smooth tracking)
+    presenceTimer = setInterval(sendPresence, 280);
+    sendPresence();
+  }
+
+  function teardownMultiplayer() {
+    if (presenceTimer) {
+      clearInterval(presenceTimer);
+      presenceTimer = null;
+    }
+    if (overlayContainer && overlayContainer.parentNode) {
+      overlayContainer.parentNode.removeChild(overlayContainer);
+      overlayContainer = null;
+    }
+    if (hudElement && hudElement.parentNode) {
+      hudElement.parentNode.removeChild(hudElement);
+      hudElement = null;
+    }
+    cursorNodes.clear();
+    highlightNodes.clear();
+  }
+
+  function injectOverlay() {
+    if (document.getElementById('axon-multiplayer-overlay')) {
+      overlayContainer = document.getElementById('axon-multiplayer-overlay');
+      return;
+    }
+    overlayContainer = document.createElement('div');
+    overlayContainer.id = 'axon-multiplayer-overlay';
+    overlayContainer.style.cssText = [
+      'position: fixed',
+      'top: 0',
+      'left: 0',
+      'width: 100vw',
+      'height: 100vh',
+      'pointer-events: none',
+      'z-index: 2147483640',
+      'overflow: hidden',
+    ].join(' !important;') + ' !important;';
+
+    // Inject animation styles
+    var style = document.createElement('style');
+    style.id = 'axon-multiplayer-styles';
+    style.textContent = `
+      @keyframes axon-pulse-ring {
+        0% { transform: scale(0.2); opacity: 1; }
+        80% { transform: scale(2.6); opacity: 0.15; }
+        100% { transform: scale(3.2); opacity: 0; }
+      }
+      .axon-cursor-wrapper {
+        position: absolute;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        will-change: transform;
+        transform: translate3d(-100px, -100px, 0);
+        transition: transform 0.08s cubic-bezier(0.2, 0, 0.2, 1);
+      }
+      .axon-hud-pulse {
+        animation: axon-hud-blink 1.8s ease-in-out infinite;
+      }
+      @keyframes axon-hud-blink {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.85); }
+      }
+    `;
+    if (!document.getElementById('axon-multiplayer-styles')) {
+      (document.head || document.documentElement).appendChild(style);
+    }
+
+    (document.body || document.documentElement).appendChild(overlayContainer);
+  }
+
+  function injectHud() {
+    if (document.getElementById('axon-multiplayer-hud')) {
+      hudElement = document.getElementById('axon-multiplayer-hud');
+      return;
+    }
+    hudElement = document.createElement('div');
+    hudElement.id = 'axon-multiplayer-hud';
+    hudElement.style.cssText = [
+      'position: fixed',
+      'bottom: 16px',
+      'right: 16px',
+      'z-index: 2147483642',
+      'background: rgba(18, 15, 38, 0.92)',
+      'backdrop-filter: blur(12px)',
+      '-webkit-backdrop-filter: blur(12px)',
+      'border: 1px solid rgba(255, 255, 255, 0.18)',
+      'border-radius: 9999px',
+      'padding: 6px 14px',
+      'display: flex',
+      'align-items: center',
+      'gap: 8px',
+      'color: #FFFFFF',
+      'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      'font-size: 11px',
+      'font-weight: 600',
+      'box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35)',
+      'cursor: pointer',
+      'user-select: none',
+      'transition: transform 0.2s ease, box-shadow 0.2s ease',
+    ].join(' !important;') + ' !important;';
+
+    hudElement.title = 'Axon Live Multiplayer: Teammates tracking active on this project';
+    updateHudText();
+    (document.body || document.documentElement).appendChild(hudElement);
+  }
+
+  function updateHudText() {
+    if (!hudElement) return;
+    var totalOnline = otherTeammates.length + 1;
+    var dotsHtml = '<span class="axon-hud-pulse" style="width: 7px; height: 7px; border-radius: 50%; background: #10B981; display: inline-block;"></span>';
+
+    var avatarsHtml = '';
+    otherTeammates.slice(0, 3).forEach(function(t) {
+      avatarsHtml += '<span style="width: 14px; height: 14px; border-radius: 50%; background: ' + (t.userColor || '#EC4899') + '; color: #fff; font-size: 8px; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; border: 1px solid #120F26; margin-left: -3px;">' +
+        (t.userName || 'T')[0].toUpperCase() + '</span>';
+    });
+
+    hudElement.innerHTML = dotsHtml +
+      '<span>Axon Multiplayer: ' + totalOnline + ' Active</span>' +
+      (avatarsHtml ? '<div style="display: flex; align-items: center; margin-left: 2px;">' + avatarsHtml + '</div>' : '');
+  }
+
+  // Mouse Listeners
+  document.addEventListener('mousemove', function(e) {
+    myMouse.x = Math.round((e.clientX / window.innerWidth) * 1000) / 10;
+    myMouse.y = Math.round((e.clientY / window.innerHeight) * 1000) / 10;
+    myMouse.pageX = e.pageX;
+    myMouse.pageY = e.pageY;
+
+    var target = e.target;
+    if (target && target !== document.body && target !== document.documentElement && !target.closest('#axon-multiplayer-overlay')) {
+      myMouse.selectedElement = getElementSelector(target);
+    }
+
+    var now = Date.now();
+    if (now - lastSent > 80) {
+      sendPresence();
+    }
+  }, { passive: true });
+
+  document.addEventListener('mousedown', function(e) {
+    if (e.target && e.target.closest && e.target.closest('#axon-multiplayer-overlay')) return;
+    myMouse.isClicking = true;
+    myMouse.lastClickTime = Date.now();
+    myMouse.x = Math.round((e.clientX / window.innerWidth) * 1000) / 10;
+    myMouse.y = Math.round((e.clientY / window.innerHeight) * 1000) / 10;
+    myMouse.pageX = e.pageX;
+    myMouse.pageY = e.pageY;
+    if (e.target) {
+      myMouse.selectedElement = getElementSelector(e.target);
+    }
+    sendPresence();
+    setTimeout(function() {
+      myMouse.isClicking = false;
+    }, 400);
+  }, { passive: true });
+
+  async function sendPresence() {
+    if (!authSession || !authSession.serverUrl || !authSession.token) return;
+    lastSent = Date.now();
+
+    var payload = {
+      userId: authSession.user.id,
+      userName: authSession.user.name || 'Collaborator',
+      userEmail: authSession.user.email || '',
+      userColor: authSession.user.cursorColor || '#6366F1',
+      userAvatar: authSession.user.avatar || '',
+      role: authSession.user.role || 'developer',
+      projectId: authSession.activeProjectId || (authSession.projects && authSession.projects[0] && authSession.projects[0].id) || 'proj-live',
+      route: window.location.href,
+      cursorX: myMouse.x,
+      cursorY: myMouse.y,
+      pageX: myMouse.pageX,
+      pageY: myMouse.pageY,
+      selectedElement: myMouse.selectedElement,
+      isClicking: myMouse.isClicking,
+      lastClickTime: myMouse.lastClickTime,
+    };
+
+    try {
+      var res = await fetch(authSession.serverUrl + '/api/extension/presence', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + authSession.token,
+          'x-user-id': authSession.user.id,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        var json = await res.json();
+        if (json.success && Array.isArray(json.presence)) {
+          var myId = authSession.user.id;
+          otherTeammates = json.presence.filter(function(t) {
+            return t.userId && t.userId !== myId;
+          });
+          renderMultiplayer();
+          updateHudText();
+        }
+      }
+    } catch (_) {
+      // Network hiccup gracefully ignored
+    }
+  }
+
+  function renderMultiplayer() {
+    if (!overlayContainer) injectOverlay();
+    if (!overlayContainer) return;
+
+    var activeIds = new Set();
+
+    otherTeammates.forEach(function(t) {
+      activeIds.add(t.userId);
+      var xPx = (t.cursorX / 100) * window.innerWidth;
+      var yPx = (t.cursorY / 100) * window.innerHeight;
+      var color = t.userColor || '#EC4899';
+      var isClicking = Boolean(t.isClicking || (t.lastClickTime && Date.now() - t.lastClickTime < 600));
+
+      // 1. Render Cursor Node
+      var cursorNode = cursorNodes.get(t.userId);
+      if (!cursorNode) {
+        cursorNode = document.createElement('div');
+        cursorNode.className = 'axon-cursor-wrapper';
+        cursorNode.id = 'axon-cursor-' + t.userId;
+        overlayContainer.appendChild(cursorNode);
+        cursorNodes.set(t.userId, cursorNode);
+      }
+
+      // Smooth translation
+      cursorNode.style.transform = 'translate3d(' + xPx + 'px, ' + yPx + 'px, 0)';
+
+      cursorNode.innerHTML = `
+        <div style="position: relative; display: inline-block;">
+          <!-- SVG Cursor Pointer -->
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="${color}" stroke="#FFFFFF" stroke-width="1.5" style="filter: drop-shadow(0 3px 6px rgba(0,0,0,0.45)); display: block;">
+            <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87a.5.5 0 0 0 .35-.85L6.35 2.86a.5.5 0 0 0-.85.35z"/>
+          </svg>
+
+          <!-- Click Ripple Animation Ring -->
+          ${isClicking ? `
+            <span style="
+              position: absolute;
+              top: -8px;
+              left: -8px;
+              width: 32px;
+              height: 32px;
+              border-radius: 50%;
+              border: 2.5px solid ${color};
+              animation: axon-pulse-ring 0.65s cubic-bezier(0, 0, 0.2, 1) forwards;
+              pointer-events: none;
+            "></span>
+          ` : ''}
+
+          <!-- Teammate Name & Role Tag -->
+          <div style="
+            position: absolute;
+            left: 14px;
+            top: 14px;
+            background: ${color};
+            color: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2.5px 8px;
+            border-radius: 9999px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+            border: 1.5px solid rgba(255,255,255,0.7);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+          ">
+            <span>${t.userName || 'Teammate'}</span>
+            ${t.role ? `<span style="font-size: 9px; opacity: 0.85; text-transform: uppercase; font-weight: 500;">(${t.role})</span>` : ''}
+          </div>
+        </div>
+      `;
+
+      // 2. Render Selected/Inspected DOM Element Highlight
+      if (t.selectedElement) {
+        try {
+          var targetEl = document.querySelector(t.selectedElement);
+          if (targetEl && targetEl !== document.body && targetEl !== document.documentElement) {
+            var rect = targetEl.getBoundingClientRect();
+            var highlightNode = highlightNodes.get(t.userId);
+            if (!highlightNode) {
+              highlightNode = document.createElement('div');
+              highlightNode.id = 'axon-highlight-' + t.userId;
+              highlightNode.style.cssText = [
+                'position: fixed',
+                'pointer-events: none',
+                'z-index: 2147483639',
+                'transition: all 0.15s ease',
+              ].join(' !important;') + ' !important;';
+              overlayContainer.appendChild(highlightNode);
+              highlightNodes.set(t.userId, highlightNode);
+            }
+
+            highlightNode.style.top = rect.top + 'px';
+            highlightNode.style.left = rect.left + 'px';
+            highlightNode.style.width = rect.width + 'px';
+            highlightNode.style.height = rect.height + 'px';
+            highlightNode.style.border = '2px dashed ' + color;
+            highlightNode.style.borderRadius = '4px';
+            highlightNode.style.boxShadow = '0 0 10px ' + color + '40';
+            highlightNode.innerHTML = `
+              <div style="
+                position: absolute;
+                top: -18px;
+                left: 0;
+                background: ${color};
+                color: #FFFFFF;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-size: 9px;
+                font-weight: 700;
+                padding: 1px 6px;
+                border-radius: 4px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                white-space: nowrap;
+              ">
+                👀 ${t.userName} is inspecting
+              </div>
+            `;
+          } else {
+            removeHighlight(t.userId);
+          }
+        } catch (_) {
+          removeHighlight(t.userId);
+        }
+      } else {
+        removeHighlight(t.userId);
+      }
+    });
+
+    // Clean up disconnected teammates
+    cursorNodes.forEach(function(node, uid) {
+      if (!activeIds.has(uid)) {
+        if (node.parentNode) node.parentNode.removeChild(node);
+        cursorNodes.delete(uid);
+      }
+    });
+    highlightNodes.forEach(function(node, uid) {
+      if (!activeIds.has(uid)) {
+        if (node.parentNode) node.parentNode.removeChild(node);
+        highlightNodes.delete(uid);
+      }
+    });
+  }
+
+  function removeHighlight(uid) {
+    var node = highlightNodes.get(uid);
+    if (node) {
+      if (node.parentNode) node.parentNode.removeChild(node);
+      highlightNodes.delete(uid);
+    }
+  }
+
+  // Storage listener
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener(function(changes, area) {
+      if (area === 'local' && changes.axon_auth_session) {
+        updateAuth(changes.axon_auth_session.newValue);
+      }
+    });
+  }
+
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'AXON_CONNECT_SUCCESS') {
+      getStorageSession(function(s) { updateAuth(s); });
+    }
+  });
+
+  // Startup initialization
+  getStorageSession(function(s) {
+    updateAuth(s);
+  });
+})();
+
+

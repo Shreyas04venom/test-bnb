@@ -59,19 +59,42 @@ export default function CollaborationPage() {
       if (activeProject?.id) {
         fetchProjectCollaborators(activeProject.id);
       }
-    }, 2500);
+    }, 600);
 
     const handleMouseMove = (e: MouseEvent) => {
       if (typeof window !== 'undefined') {
         (window as any).__axon_cursorX = Math.round((e.clientX / window.innerWidth) * 100);
         (window as any).__axon_cursorY = Math.round((e.clientY / window.innerHeight) * 100);
+        (window as any).__axon_pageX = e.pageX;
+        (window as any).__axon_pageY = e.pageY;
       }
     };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (typeof window !== 'undefined') {
+        (window as any).__axon_isClicking = true;
+        (window as any).__axon_lastClickTime = Date.now();
+        syncPresence();
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          (window as any).__axon_isClicking = false;
+        }, 400);
+      }
+    };
+
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    window.addEventListener('mousedown', handleMouseDown, { passive: true });
+    window.addEventListener('mouseup', handleMouseUp, { passive: true });
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [activeProject?.id]);
 
@@ -595,6 +618,113 @@ export default function CollaborationPage() {
           </div>
         </div>
       )}
+
+      {/* LIVE MULTIPLAYER CURSOR CANVAS */}
+      <MultiplayerCursorCanvas
+        presence={projectPresence}
+        currentUserId={currentUser?.id}
+      />
     </DashboardLayout>
+  );
+}
+
+function MultiplayerCursorCanvas({
+  presence,
+  currentUserId,
+}: {
+  presence: any[];
+  currentUserId?: string;
+}) {
+  const otherTeammates = presence.filter((p) => p.userId && p.userId !== currentUserId);
+
+  if (otherTeammates.length === 0) return null;
+
+  return (
+    <div
+      className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden"
+      aria-hidden="true"
+    >
+      {otherTeammates.map((t) => {
+        const xPercent = typeof t.cursorX === 'number' ? t.cursorX : 50;
+        const yPercent = typeof t.cursorY === 'number' ? t.cursorY : 50;
+        const color = t.cursorColor || '#EC4899';
+        const isClicking = Boolean(t.isClicking);
+
+        return (
+          <div
+            key={t.userId}
+            style={{
+              position: 'absolute',
+              left: `${xPercent}%`,
+              top: `${yPercent}%`,
+              transform: 'translate3d(-2px, -2px, 0)',
+              transition: 'left 0.08s linear, top 0.08s linear',
+            }}
+            className="flex flex-col items-start"
+          >
+            {/* SVG Pointer */}
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill={color}
+              stroke="#FFFFFF"
+              strokeWidth="1.5"
+              className="drop-shadow-md select-none"
+            >
+              <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87a.5.5 0 0 0 .35-.85L6.35 2.86a.5.5 0 0 0-.85.35z" />
+            </svg>
+
+            {/* Click Ripple Ring */}
+            {isClicking && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-6px',
+                  left: '-6px',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  border: `2px solid ${color}`,
+                  animation: 'ping 0.8s cubic-bezier(0, 0, 0.2, 1) infinite',
+                }}
+              />
+            )}
+
+            {/* Teammate Name Tag */}
+            <div
+              style={{
+                backgroundColor: color,
+                marginLeft: '12px',
+                marginTop: '-4px',
+              }}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-white text-[10px] font-bold shadow-lg border border-white/40 whitespace-nowrap"
+            >
+              <span>{t.name || 'Teammate'}</span>
+              {t.role && (
+                <span className="opacity-80 text-[8px] font-normal uppercase">
+                  ({t.role})
+                </span>
+              )}
+            </div>
+
+            {/* Selected DOM Element Badge if available */}
+            {t.selectedElement && (
+              <div
+                style={{
+                  backgroundColor: 'rgba(27, 19, 60, 0.85)',
+                  borderColor: color,
+                  marginLeft: '12px',
+                  marginTop: '2px',
+                }}
+                className="px-1.5 py-0.5 rounded text-[9px] font-mono text-white border shadow-xs"
+              >
+                Target: {t.selectedElement}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

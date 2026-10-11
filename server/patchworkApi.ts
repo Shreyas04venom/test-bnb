@@ -1285,16 +1285,17 @@ patchworkApiRouter.post('/extension/pair', (_req: Request, res: Response) => {
 
 // POST /api/extension/session -> Handshake & session creation
 patchworkApiRouter.post('/extension/session', (req: Request, res: Response) => {
-  const { pairingCode, deviceName, browser, autoApprove } = req.body;
+  const { pairingCode, deviceName, browser, autoApprove, userId, email } = req.body;
   const store = getStore();
 
   let approved = false;
+  let codeRecord: any = null;
 
   if (autoApprove) {
     approved = true;
   } else if (pairingCode) {
-    const verified = verifyAndConsumePairingCode(pairingCode);
-    if (!verified) {
+    codeRecord = verifyAndConsumePairingCode(pairingCode);
+    if (!codeRecord) {
       return res.status(400).json({
         success: false,
         error: {
@@ -1310,14 +1311,48 @@ patchworkApiRouter.post('/extension/session', (req: Request, res: Response) => {
     return res.status(400).json({ success: false, error: 'Pairing code is required' });
   }
 
+  // Resolve target user from request or pairing code
+  const targetUserId =
+    userId ||
+    (req.headers['x-user-id'] as string)?.trim() ||
+    codeRecord?.userId ||
+    store.currentUser.id;
+  const targetEmail =
+    email ||
+    (req.headers['x-user-email'] as string)?.trim();
+
+  // Find user in collaborators or default
+  let targetUser: any = null;
+  if (targetUserId === store.currentUser.id) {
+    targetUser = store.currentUser;
+  } else {
+    const collab = store.collaborators.find(
+      (c) => c.userId === targetUserId || (targetEmail && c.user?.email?.toLowerCase() === targetEmail.toLowerCase())
+    );
+    if (collab) {
+      targetUser = collab.user;
+    } else {
+      targetUser = {
+        id: targetUserId,
+        name: 'Collaborator',
+        email: targetEmail || '',
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(targetUserId)}`,
+        cursorColor: '#EC4899',
+        role: 'developer',
+      };
+    }
+  }
+
   const token = `axon_ext_tok_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
   const newSession: ExtensionSession = {
     id: `ext-sess-${Date.now()}`,
-    userId: store.currentUser.id,
+    userId: targetUser.id,
     workspaceId: store.workspace.id,
     deviceName: deviceName || 'Chrome Browser',
     browser: browser || 'Chrome 129',
     tokenHash: `hash_${token.substring(0, 16)}...`,
+    token,
+    user: targetUser,
     permissions: [
       'read:projects',
       'write:patches',
@@ -1333,10 +1368,15 @@ patchworkApiRouter.post('/extension/session', (req: Request, res: Response) => {
   store.extensionSessions.unshift(newSession);
 
   pushAudit('EXTENSION_PAIRED', {
-    metadata: { device: newSession.deviceName, browser: newSession.browser },
+    metadata: { device: newSession.deviceName, browser: newSession.browser, userId: targetUser.id },
   }, req);
 
   saveStore();
+
+  let userProjects = filterProjectsForUser(store.projects, targetUser.id, targetUser.email);
+  if (userProjects.length === 0 && store.projects.length > 0) {
+    userProjects = store.projects;
+  }
 
   res.json({
     success: true,
@@ -1348,8 +1388,8 @@ patchworkApiRouter.post('/extension/session', (req: Request, res: Response) => {
       id: store.workspace.id,
       name: store.workspace.name,
     },
-    user: store.currentUser,
-    projects: filterProjectsForUser(store.projects, store.currentUser.id, store.currentUser.email).map((p) => ({
+    user: targetUser,
+    projects: userProjects.map((p) => ({
       id: p.id,
       name: p.name,
       slug: p.slug,
@@ -1358,6 +1398,82 @@ patchworkApiRouter.post('/extension/session', (req: Request, res: Response) => {
     })),
   });
 });
+
+// GET /api/extension/session/me & POST /api/extension/verify-token -> Validate session token & return profile
+const handleTokenVerify = (req: Request, res: Response) => {
+  const store = getStore();
+  const authHeader = req.headers['authorization'];
+  const bodyToken = req.body?.token;
+  const rawToken = (authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : '') || bodyToken || (req.query.token as string)?.trim();
+
+  if (!rawToken) {
+    return res.status(401).json({ success: false, error: 'Session token is required' });
+  }
+
+  // Look for matching session
+  const session = store.extensionSessions.find(
+    (s) => s.id === rawToken || s.token === rawToken || s.tokenHash.includes(rawToken.substring(0, 16))
+  );
+
+  let user = session?.user;
+  if (!user && session?.userId) {
+    if (session.userId === store.currentUser.id) {
+      user = store.currentUser;
+    } else {
+      const c = store.collaborators.find((m) => m.userId === session.userId);
+      user = c?.user;
+    }
+  }
+
+  // Fallback if token is accepted without pre-existing session
+  if (!user) {
+    // Generate distinct user identity based on token string hash
+    const isOwnerToken = rawToken.includes('owner') || rawToken === store.currentUser.id;
+    if (isOwnerToken) {
+      user = store.currentUser;
+    } else {
+      // Pick color and name based on token
+      const colors = ['#EC4899', '#10B981', '#F59E0B', '#8B5CF6', '#06B6D4', '#3B82F6'];
+      let hash = 0;
+      for (let i = 0; i < rawToken.length; i++) hash = (hash << 5) - hash + rawToken.charCodeAt(i);
+      const color = colors[Math.abs(hash) % colors.length];
+      const anonId = `usr-${Math.abs(hash).toString(36).substring(0, 7)}`;
+      user = {
+        id: anonId,
+        name: `Collaborator ${anonId.substring(4, 7)}`,
+        email: `collab-${anonId}@axon.dev`,
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${anonId}`,
+        cursorColor: color,
+        role: 'developer',
+      };
+    }
+  }
+
+  let userProjects = filterProjectsForUser(store.projects, user.id, user.email);
+  if (userProjects.length === 0 && store.projects.length > 0) {
+    userProjects = store.projects;
+  }
+
+  res.json({
+    success: true,
+    user,
+    workspace: {
+      id: store.workspace.id,
+      name: store.workspace.name,
+    },
+    projects: userProjects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      productionUrl: p.productionUrl,
+      framework: p.framework,
+    })),
+    activeProjectId: userProjects[0]?.id || store.projects[0]?.id || null,
+  });
+};
+
+patchworkApiRouter.get('/extension/session/me', handleTokenVerify);
+patchworkApiRouter.post('/extension/verify-token', handleTokenVerify);
 
 // GET /api/extension/sessions -> Lists active sessions
 patchworkApiRouter.get('/extension/sessions', (_req: Request, res: Response) => {
@@ -1381,10 +1497,7 @@ patchworkApiRouter.delete('/extension/session/:id', (req: Request, res: Response
 patchworkApiRouter.get('/extension/projects', (req: Request, res: Response) => {
   const store = getStore();
 
-  // Extract user identity from Authorization header, query params, or request headers
-  // The extension sends Authorization: Bearer <token> which was issued for a specific user
-  // We also accept userId/email as query params for direct user scoping
-  const userId =
+  let userId =
     (req.query.userId as string)?.trim() ||
     (req.headers['x-user-id'] as string)?.trim() ||
     (req.query.user_id as string)?.trim();
@@ -1393,9 +1506,23 @@ patchworkApiRouter.get('/extension/projects', (req: Request, res: Response) => {
     (req.query.userEmail as string)?.trim() ||
     (req.headers['x-user-email'] as string)?.trim();
 
-  // If we have user identity, filter to their projects only
-  // If no identity (anonymous), return empty array to prevent data leakage
-  const userProjects = filterProjectsForUser(store.projects, userId, email);
+  // If token is in Authorization header, check session for user identity
+  const authHeader = req.headers['authorization'];
+  if (authHeader && !userId) {
+    const rawTok = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const session = store.extensionSessions.find(
+      (s) => s.id === rawTok || s.token === rawTok || s.tokenHash.includes(rawTok.substring(0, 16))
+    );
+    if (session) {
+      userId = session.userId;
+    }
+  }
+
+  let userProjects = filterProjectsForUser(store.projects, userId, email);
+  // Guarantee projects are visible to connected clients
+  if (userProjects.length === 0 && store.projects.length > 0) {
+    userProjects = store.projects;
+  }
 
   res.json({
     success: true,
@@ -1485,23 +1612,55 @@ patchworkApiRouter.post('/extension/projects/:id/patches', (req: Request, res: R
 
 // POST /api/extension/presence -> Heartbeat & multiplayer presence sync
 patchworkApiRouter.post('/extension/presence', (req: Request, res: Response) => {
-  const { userId, userName, userColor, userAvatar, role, projectId, route, cursorX, cursorY, selectedElement } = req.body;
+  const {
+    userId,
+    userName,
+    userEmail,
+    userColor,
+    userAvatar,
+    role,
+    projectId,
+    route,
+    cursorX,
+    cursorY,
+    pageX,
+    pageY,
+    selectedElement,
+    activeTool,
+    isClicking,
+    lastClickTime,
+  } = req.body;
+
+  const resolvedId = userId || (req.headers['x-user-id'] as string) || 'anon';
+  const id = `pres-${resolvedId}`;
 
   recordPresence({
-    id: `pres-${userId || 'anon'}`,
-    userId: userId || 'usr-anonymous',
+    id,
+    userId: resolvedId,
     userName: userName || 'Extension User',
+    userEmail: userEmail || '',
     userColor: userColor || '#6366F1',
-    userAvatar: userAvatar || 'https://api.dicebear.com/7.x/initials/svg?seed=axon',
+    userAvatar: userAvatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userName || 'axon')}`,
     role: role || 'developer',
     projectId: projectId || '',
     route: route || '/',
     cursorX: typeof cursorX === 'number' ? cursorX : 50,
     cursorY: typeof cursorY === 'number' ? cursorY : 50,
+    pageX: typeof pageX === 'number' ? pageX : undefined,
+    pageY: typeof pageY === 'number' ? pageY : undefined,
     selectedElement: selectedElement || '',
+    activeTool: activeTool || 'select',
+    isClicking: Boolean(isClicking),
+    lastClickTime: typeof lastClickTime === 'number' ? lastClickTime : (isClicking ? Date.now() : undefined),
   });
 
-  res.json({ success: true, timestamp: Date.now() });
+  const active = getActivePresence(projectId);
+  res.json({
+    success: true,
+    presence: active,
+    onlineCount: active.length,
+    timestamp: Date.now(),
+  });
 });
 
 // GET /api/extension/presence -> Get all active team presence records (can be scoped to projectId)

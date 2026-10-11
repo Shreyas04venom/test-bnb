@@ -413,7 +413,11 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
               route: typeof window !== 'undefined' ? window.location.pathname : '/',
               cursorX: typeof win.__axon_cursorX === 'number' ? win.__axon_cursorX : 50,
               cursorY: typeof win.__axon_cursorY === 'number' ? win.__axon_cursorY : 50,
-              selectedElement: '',
+              pageX: typeof win.__axon_pageX === 'number' ? win.__axon_pageX : undefined,
+              pageY: typeof win.__axon_pageY === 'number' ? win.__axon_pageY : undefined,
+              isClicking: Boolean(win.__axon_isClicking),
+              lastClickTime: win.__axon_lastClickTime,
+              selectedElement: win.__axon_selectedElement || '',
             }),
           });
         } catch {
@@ -439,7 +443,14 @@ export const usePatchworkStore = create<PatchworkStoreState>()(
                   currentProject: p.projectId || '',
                   selectedElement: p.selectedElement || null,
                   lastSeen: 'Just now',
+                  cursorX: p.cursorX || 50,
+                  cursorY: p.cursorY || 50,
+                  pageX: p.pageX,
+                  pageY: p.pageY,
+                  isClicking: p.isClicking,
+                  lastClickTime: p.lastClickTime,
                   cursorPosition: { x: p.cursorX || 50, y: p.cursorY || 50 },
+                  role: p.role || 'developer',
                   status: 'online',
                 })),
               });

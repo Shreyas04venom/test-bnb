@@ -28,8 +28,12 @@ export interface PresenceRecord {
   route: string;
   cursorX: number;
   cursorY: number;
+  pageX?: number;
+  pageY?: number;
   selectedElement: string;
   activeTool?: string;
+  isClicking?: boolean;
+  lastClickTime?: number;
   lastActiveAt: number;
 }
 
@@ -225,8 +229,7 @@ export function getActivePresence(projectId?: string, route?: string): PresenceR
     if (item.lastActiveAt < cutoff) {
       livePresence.delete(id);
     } else {
-      if (projectId && item.projectId !== projectId) continue;
-      if (route && item.route !== route) continue;
+      if (projectId && item.projectId && item.projectId !== projectId) continue;
       active.push(item);
     }
   }
