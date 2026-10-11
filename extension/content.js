@@ -196,6 +196,8 @@ ${o(n.styleChanges)}`}return r===0&&!xe?`## Route: ${n.url}
   var otherTeammates = [];
   var overlayContainer = null;
   var cursorNodes = new Map();
+  var cursorPhysics = new Map();
+  var animFrameId = null;
   var highlightNodes = new Map();
   var hudElement = null;
 
@@ -278,13 +280,39 @@ ${o(n.styleChanges)}`}return r===0&&!xe?`## Route: ${n.url}
     setupMultiplayer();
   }
 
+  // Figma 60 FPS Continuous LERP Physics Loop
+  function runPhysicsLoop() {
+    cursorPhysics.forEach(function(state) {
+      // Linear interpolation with smooth 0.20 physics coefficient
+      var dx = state.targetX - state.currentX;
+      var dy = state.targetY - state.currentY;
+
+      state.currentX += dx * 0.20;
+      state.currentY += dy * 0.20;
+
+      // Figma Dynamic Velocity Angle Tilt:
+      // Rotates smoothly depending on horizontal momentum
+      var targetTilt = Math.max(-8, Math.min(8, (dx * 0.20) * 0.45));
+      state.tilt += (targetTilt - state.tilt) * 0.15;
+
+      state.node.style.transform = 'translate3d(' + state.currentX.toFixed(2) + 'px, ' + state.currentY.toFixed(2) + 'px, 0) rotate(' + state.tilt.toFixed(2) + 'deg)';
+    });
+
+    animFrameId = requestAnimationFrame(runPhysicsLoop);
+  }
+
   function setupMultiplayer() {
     if (presenceTimer) clearInterval(presenceTimer);
     injectOverlay();
     injectHud();
 
-    // Start presence heartbeat loop (every 280ms for ultra smooth tracking)
-    presenceTimer = setInterval(sendPresence, 280);
+    // Start 60 FPS physics animation loop
+    if (!animFrameId) {
+      animFrameId = requestAnimationFrame(runPhysicsLoop);
+    }
+
+    // High frequency presence heartbeat (every 180ms for ultra responsive multi-client tracking)
+    presenceTimer = setInterval(sendPresence, 180);
     sendPresence();
   }
 
@@ -292,6 +320,10 @@ ${o(n.styleChanges)}`}return r===0&&!xe?`## Route: ${n.url}
     if (presenceTimer) {
       clearInterval(presenceTimer);
       presenceTimer = null;
+    }
+    if (animFrameId) {
+      cancelAnimationFrame(animFrameId);
+      animFrameId = null;
     }
     if (overlayContainer && overlayContainer.parentNode) {
       overlayContainer.parentNode.removeChild(overlayContainer);
@@ -302,6 +334,7 @@ ${o(n.styleChanges)}`}return r===0&&!xe?`## Route: ${n.url}
       hudElement = null;
     }
     cursorNodes.clear();
+    cursorPhysics.clear();
     highlightNodes.clear();
   }
 
@@ -328,8 +361,8 @@ ${o(n.styleChanges)}`}return r===0&&!xe?`## Route: ${n.url}
     style.id = 'axon-multiplayer-styles';
     style.textContent = `
       @keyframes axon-pulse-ring {
-        0% { transform: scale(0.2); opacity: 1; }
-        80% { transform: scale(2.6); opacity: 0.15; }
+        0% { transform: scale(0.3); opacity: 1; }
+        60% { transform: scale(2.4); opacity: 0.35; }
         100% { transform: scale(3.2); opacity: 0; }
       }
       .axon-cursor-wrapper {
@@ -338,8 +371,22 @@ ${o(n.styleChanges)}`}return r===0&&!xe?`## Route: ${n.url}
         left: 0;
         pointer-events: none;
         will-change: transform;
-        transform: translate3d(-100px, -100px, 0);
-        transition: transform 0.08s cubic-bezier(0.2, 0, 0.2, 1);
+        transform: translate3d(-200px, -200px, 0);
+        transition: none !important;
+        transform-origin: 0 0;
+      }
+      .axon-cursor-ripple {
+        position: absolute;
+        top: -10px;
+        left: -10px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        pointer-events: none;
+        opacity: 0;
+      }
+      .axon-cursor-ripple.active {
+        animation: axon-pulse-ring 0.65s cubic-bezier(0, 0, 0.2, 1) forwards;
       }
       .axon-hud-pulse {
         animation: axon-hud-blink 1.8s ease-in-out infinite;
@@ -421,7 +468,7 @@ ${o(n.styleChanges)}`}return r===0&&!xe?`## Route: ${n.url}
     }
 
     var now = Date.now();
-    if (now - lastSent > 80) {
+    if (now - lastSent > 70) {
       sendPresence();
     }
   }, { passive: true });
@@ -500,70 +547,85 @@ ${o(n.styleChanges)}`}return r===0&&!xe?`## Route: ${n.url}
 
     otherTeammates.forEach(function(t) {
       activeIds.add(t.userId);
-      var xPx = (t.cursorX / 100) * window.innerWidth;
-      var yPx = (t.cursorY / 100) * window.innerHeight;
+      var targetX = (t.cursorX / 100) * window.innerWidth;
+      var targetY = (t.cursorY / 100) * window.innerHeight;
       var color = t.userColor || '#EC4899';
       var isClicking = Boolean(t.isClicking || (t.lastClickTime && Date.now() - t.lastClickTime < 600));
 
-      // 1. Render Cursor Node
-      var cursorNode = cursorNodes.get(t.userId);
-      if (!cursorNode) {
-        cursorNode = document.createElement('div');
+      // 1. Maintain Figma Cursor Physics & DOM Node
+      var state = cursorPhysics.get(t.userId);
+      if (!state) {
+        var cursorNode = document.createElement('div');
         cursorNode.className = 'axon-cursor-wrapper';
         cursorNode.id = 'axon-cursor-' + t.userId;
+
+        cursorNode.innerHTML = `
+          <div style="position: relative; display: inline-block;">
+            <!-- Click Ripple Animation Ring -->
+            <div class="axon-cursor-ripple" style="border: 2.5px solid ${color};"></div>
+
+            <!-- Authentic Figma Multiplayer Vector Cursor -->
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="${color}" stroke="#FFFFFF" stroke-width="1.5" stroke-linejoin="round" style="filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4)); display: block;">
+              <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87a.5.5 0 0 0 .35-.85L6.35 2.86a.5.5 0 0 0-.85.35z"/>
+            </svg>
+
+            <!-- Figma Teammate Name & Role Tag -->
+            <div class="axon-cursor-tag" style="
+              position: absolute;
+              left: 14px;
+              top: 14px;
+              background: ${color};
+              color: #FFFFFF;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              font-size: 11px;
+              font-weight: 700;
+              padding: 2.5px 8px;
+              border-radius: 4px 10px 10px 10px;
+              box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+              border: 1.5px solid rgba(255,255,255,0.7);
+              white-space: nowrap;
+              display: flex;
+              align-items: center;
+              gap: 4px;
+              pointer-events: none;
+            ">
+              <span class="axon-cursor-name">${t.userName || 'Teammate'}</span>
+              ${t.role ? `<span style="font-size: 9px; opacity: 0.85; text-transform: uppercase; font-weight: 500;">(${t.role})</span>` : ''}
+            </div>
+          </div>
+        `;
+
         overlayContainer.appendChild(cursorNode);
+
+        state = {
+          node: cursorNode,
+          rippleNode: cursorNode.querySelector('.axon-cursor-ripple'),
+          nameSpan: cursorNode.querySelector('.axon-cursor-name'),
+          currentX: targetX,
+          currentY: targetY,
+          targetX: targetX,
+          targetY: targetY,
+          tilt: 0,
+          lastClickState: false,
+        };
+        cursorPhysics.set(t.userId, state);
         cursorNodes.set(t.userId, cursorNode);
+      } else {
+        // Update destination target smoothly without DOM rebuild
+        state.targetX = targetX;
+        state.targetY = targetY;
+        if (state.nameSpan && state.nameSpan.textContent !== (t.userName || 'Teammate')) {
+          state.nameSpan.textContent = t.userName || 'Teammate';
+        }
       }
 
-      // Smooth translation
-      cursorNode.style.transform = 'translate3d(' + xPx + 'px, ' + yPx + 'px, 0)';
-
-      cursorNode.innerHTML = `
-        <div style="position: relative; display: inline-block;">
-          <!-- SVG Cursor Pointer -->
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="${color}" stroke="#FFFFFF" stroke-width="1.5" style="filter: drop-shadow(0 3px 6px rgba(0,0,0,0.45)); display: block;">
-            <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87a.5.5 0 0 0 .35-.85L6.35 2.86a.5.5 0 0 0-.85.35z"/>
-          </svg>
-
-          <!-- Click Ripple Animation Ring -->
-          ${isClicking ? `
-            <span style="
-              position: absolute;
-              top: -8px;
-              left: -8px;
-              width: 32px;
-              height: 32px;
-              border-radius: 50%;
-              border: 2.5px solid ${color};
-              animation: axon-pulse-ring 0.65s cubic-bezier(0, 0, 0.2, 1) forwards;
-              pointer-events: none;
-            "></span>
-          ` : ''}
-
-          <!-- Teammate Name & Role Tag -->
-          <div style="
-            position: absolute;
-            left: 14px;
-            top: 14px;
-            background: ${color};
-            color: #FFFFFF;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 2.5px 8px;
-            border-radius: 9999px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.35);
-            border: 1.5px solid rgba(255,255,255,0.7);
-            white-space: nowrap;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-          ">
-            <span>${t.userName || 'Teammate'}</span>
-            ${t.role ? `<span style="font-size: 9px; opacity: 0.85; text-transform: uppercase; font-weight: 500;">(${t.role})</span>` : ''}
-          </div>
-        </div>
-      `;
+      // Trigger click ripple wave
+      if (isClicking && !state.lastClickState && state.rippleNode) {
+        state.rippleNode.classList.remove('active');
+        void state.rippleNode.offsetWidth;
+        state.rippleNode.classList.add('active');
+      }
+      state.lastClickState = isClicking;
 
       // 2. Render Selected/Inspected DOM Element Highlight
       if (t.selectedElement) {
@@ -622,9 +684,12 @@ ${o(n.styleChanges)}`}return r===0&&!xe?`## Route: ${n.url}
     });
 
     // Clean up disconnected teammates
-    cursorNodes.forEach(function(node, uid) {
+    cursorPhysics.forEach(function(state, uid) {
       if (!activeIds.has(uid)) {
-        if (node.parentNode) node.parentNode.removeChild(node);
+        if (state.node && state.node.parentNode) {
+          state.node.parentNode.removeChild(state.node);
+        }
+        cursorPhysics.delete(uid);
         cursorNodes.delete(uid);
       }
     });

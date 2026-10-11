@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import { SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
 import {
@@ -42,6 +42,23 @@ export default function Home() {
   const { patches, deployments, verificationRun } = usePatchworkStore();
   const [activeTab, setActiveTab] = useState<'preview' | 'diff' | 'verification' | 'git'>('preview');
 
+  useEffect(() => {
+    const scrollToTarget = () => {
+      const hash = window.location.hash;
+      const path = window.location.pathname;
+      const targetId = hash ? hash.slice(1) : path === '/pricing' ? 'pricing' : null;
+      if (targetId) {
+        const el = document.getElementById(targetId);
+        if (el) {
+          setTimeout(() => el.scrollIntoView({ behavior: 'smooth' }), 100);
+        }
+      }
+    };
+    scrollToTarget();
+    window.addEventListener('hashchange', scrollToTarget);
+    return () => window.removeEventListener('hashchange', scrollToTarget);
+  }, []);
+
   return (
     <div className="relative min-h-screen bg-[#f3f1ec] text-[#1B133C] selection:bg-indigo-500/20 selection:text-[#1B133C]">
       {/* Background Video Veil */}
@@ -74,6 +91,16 @@ export default function Home() {
                 <a
                   key={link.label}
                   href={link.href}
+                  onClick={(e) => {
+                    if (link.href.startsWith('#')) {
+                      e.preventDefault();
+                      const target = document.querySelector(link.href);
+                      if (target) {
+                        target.scrollIntoView({ behavior: 'smooth' });
+                        window.history.pushState(null, '', link.href);
+                      }
+                    }
+                  }}
                   className="text-xs font-medium text-[#1B133C]/75 transition-colors hover:text-[#1B133C]"
                 >
                   {link.label}
@@ -196,33 +223,29 @@ export default function Home() {
             <div className="flex items-center rounded-lg bg-black/5 p-1 gap-1">
               <button
                 onClick={() => setActiveTab('preview')}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                  activeTab === 'preview' ? 'bg-white shadow-xs text-[#1B133C]' : 'text-[#1B133C]/60 hover:text-[#1B133C]'
-                }`}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${activeTab === 'preview' ? 'bg-white shadow-xs text-[#1B133C]' : 'text-[#1B133C]/60 hover:text-[#1B133C]'
+                  }`}
               >
                 Visual Preview
               </button>
               <button
                 onClick={() => setActiveTab('diff')}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                  activeTab === 'diff' ? 'bg-white shadow-xs text-[#1B133C]' : 'text-[#1B133C]/60 hover:text-[#1B133C]'
-                }`}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${activeTab === 'diff' ? 'bg-white shadow-xs text-[#1B133C]' : 'text-[#1B133C]/60 hover:text-[#1B133C]'
+                  }`}
               >
                 Git Diff
               </button>
               <button
                 onClick={() => setActiveTab('verification')}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                  activeTab === 'verification' ? 'bg-white shadow-xs text-[#1B133C]' : 'text-[#1B133C]/60 hover:text-[#1B133C]'
-                }`}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${activeTab === 'verification' ? 'bg-white shadow-xs text-[#1B133C]' : 'text-[#1B133C]/60 hover:text-[#1B133C]'
+                  }`}
               >
                 Verification (12/12)
               </button>
               <button
                 onClick={() => setActiveTab('git')}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                  activeTab === 'git' ? 'bg-white shadow-xs text-[#1B133C]' : 'text-[#1B133C]/60 hover:text-[#1B133C]'
-                }`}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${activeTab === 'git' ? 'bg-white shadow-xs text-[#1B133C]' : 'text-[#1B133C]/60 hover:text-[#1B133C]'
+                  }`}
               >
                 History & Deploy
               </button>
@@ -586,6 +609,243 @@ export default function Home() {
             <p className="text-xs text-[#1B133C]/70 mt-2 leading-relaxed">
               Realtime cursor identities, active routes, and element collision prevention ensure team members never overwrite each other&apos;s patches.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION: PRICING */}
+      <section id="pricing" className="scroll-mt-24 relative z-10 mx-auto max-w-6xl px-4 py-20 border-t border-black/10">
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Transparent Pricing</span>
+          <h2 className="font-serif text-3xl sm:text-5xl text-[#1B133C] mt-2">
+            Predictable plans for every scale
+          </h2>
+          <p className="text-sm text-[#1B133C]/70 mt-4 leading-relaxed">
+            Start free and upgrade as your team grows. Flexible plans for individual developers, small agencies, and enterprise organizations.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+          {/* PLAN 1: FREE */}
+          <div className="glass-card flex flex-col justify-between p-6 sm:p-7 border border-white/80 rounded-2xl bg-white/70 backdrop-blur-md shadow-xs hover:shadow-md transition-all">
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="font-serif text-xl font-medium text-[#1B133C]">Free</h3>
+              </div>
+              <p className="text-xs text-[#1B133C]/70 mt-2 min-h-[36px] leading-relaxed">
+                For students and developers getting started with AXON.
+              </p>
+              <div className="mt-5 pb-5 border-b border-black/5">
+                <div className="flex items-baseline gap-1">
+                  <span className="font-serif text-3xl sm:text-4xl font-normal text-[#1B133C]">₹0</span>
+                  <span className="text-xs text-[#1B133C]/60 font-medium">/month</span>
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <p className="text-[11px] font-semibold text-[#1B133C]/80 uppercase tracking-wider mb-3">
+                  Features:
+                </p>
+                <ul className="space-y-2.5">
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Access to the core AXON experience.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Basic visual editing, where currently supported.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Basic patch management, where currently supported.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Suitable for trying the platform.</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-4 border-t border-black/5">
+              <Link
+                href="/signup"
+                className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-black/15 bg-white px-4 py-2.5 text-xs font-semibold text-[#1B133C] hover:bg-slate-50 transition-all shadow-2xs"
+              >
+                <span>Get Started Free</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+
+          {/* PLAN 2: PRO */}
+          <div className="glass-card flex flex-col justify-between p-6 sm:p-7 border border-white/80 rounded-2xl bg-white/70 backdrop-blur-md shadow-xs hover:shadow-md transition-all">
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="font-serif text-xl font-medium text-[#1B133C]">Pro</h3>
+              </div>
+              <p className="text-xs text-[#1B133C]/70 mt-2 min-h-[36px] leading-relaxed">
+                For individual developers managing regular website changes.
+              </p>
+              <div className="mt-5 pb-5 border-b border-black/5">
+                <div className="flex items-baseline gap-1">
+                  <span className="font-serif text-3xl sm:text-4xl font-normal text-[#1B133C]">₹499</span>
+                  <span className="text-xs text-[#1B133C]/60 font-medium">/month</span>
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <p className="text-[11px] font-semibold text-[#1B133C]/80 uppercase tracking-wider mb-3">
+                  Features:
+                </p>
+                <ul className="space-y-2.5">
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Everything in Free.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Higher project and patch limits, if supported.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Extended patch history, if supported.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>AI-assisted editing suggestions, when available.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>More advanced editing and change-management tools as they become available.</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-4 border-t border-black/5">
+              <Link
+                href="/signup?plan=pro"
+                className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-black/15 bg-white px-4 py-2.5 text-xs font-semibold text-[#1B133C] hover:bg-slate-50 transition-all shadow-2xs"
+              >
+                <span>Choose Pro</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+
+          {/* PLAN 3: TEAM (RECOMMENDED) */}
+          <div className="glass-card flex flex-col justify-between p-6 sm:p-7 border-2 border-[#1B133C] rounded-2xl bg-white/95 shadow-xl relative scale-[1.02] transition-all">
+            <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#1B133C] px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-xs">
+              RECOMMENDED
+            </span>
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="font-serif text-xl font-medium text-[#1B133C]">Team</h3>
+              </div>
+              <p className="text-xs text-[#1B133C]/70 mt-2 min-h-[36px] leading-relaxed">
+                For development teams and small agencies managing multiple websites.
+              </p>
+              <div className="mt-5 pb-5 border-b border-black/5">
+                <div className="flex items-baseline gap-1">
+                  <span className="font-serif text-3xl sm:text-4xl font-normal text-[#1B133C]">₹2,499</span>
+                  <span className="text-xs text-[#1B133C]/60 font-medium">/month</span>
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <p className="text-[11px] font-semibold text-[#1B133C]/80 uppercase tracking-wider mb-3">
+                  Features:
+                </p>
+                <ul className="space-y-2.5">
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Everything in Pro.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Shared team workspaces, when available.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Patch review and approval workflows, when available.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Team activity history, when available.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Conflict detection and change tracking, when available.</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-4 border-t border-black/5">
+              <Link
+                href="/signup?plan=team"
+                className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#1B133C] px-4 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-black transition-all hover:scale-[1.01]"
+              >
+                <span>Choose Team</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+
+          {/* PLAN 4: ENTERPRISE */}
+          <div className="glass-card flex flex-col justify-between p-6 sm:p-7 border border-white/80 rounded-2xl bg-white/70 backdrop-blur-md shadow-xs hover:shadow-md transition-all">
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="font-serif text-xl font-medium text-[#1B133C]">Enterprise</h3>
+              </div>
+              <p className="text-xs text-[#1B133C]/70 mt-2 min-h-[36px] leading-relaxed">
+                For organizations with advanced workflow and management requirements.
+              </p>
+              <div className="mt-5 pb-5 border-b border-black/5">
+                <div className="flex items-baseline gap-1">
+                  <span className="font-serif text-2xl sm:text-3xl font-normal text-[#1B133C]">Custom pricing</span>
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <p className="text-[11px] font-semibold text-[#1B133C]/80 uppercase tracking-wider mb-3">
+                  Features:
+                </p>
+                <ul className="space-y-2.5">
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Custom project and team requirements.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Advanced access controls, where available.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Audit and reporting capabilities, where available.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Integration options, subject to technical feasibility.</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs text-[#1B133C]/75 leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                    <span>Customized onboarding and support, when available.</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-4 border-t border-black/5">
+              <a
+                href="mailto:sales@axon.dev"
+                className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-black/15 bg-white px-4 py-2.5 text-xs font-semibold text-[#1B133C] hover:bg-slate-50 transition-all shadow-2xs"
+              >
+                <span>Contact Sales</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
         </div>
       </section>

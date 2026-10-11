@@ -840,6 +840,269 @@ Return ONLY a valid JSON object with format:
     return compileVisualPrompt(prompt, currentStyles, currentText);
   }
 
+  // ==========================================
+  // Pairing / Connection Modal
+  // ==========================================
+  function openModal() {
+    const existing = document.getElementById('axon-pair-modal');
+    if (existing) existing.remove();
+
+    const isConnected = Boolean(currentAuth.token);
+    const workspaceName = currentAuth.workspace?.name || 'Axon Workspace';
+    const userName = currentAuth.user?.name || 'Collaborator';
+
+    const modal = document.createElement('div');
+    modal.id = 'axon-pair-modal';
+    modal.style.cssText = `
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
+      z-index: 20000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
+
+    modal.innerHTML = `
+      <div style="background: #181530; color: #FFFFFF; width: 100%; max-width: 400px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6); overflow: hidden;">
+        <div style="padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-weight: 700; font-size: 13px; color: #818CF8; display: flex; align-items: center; gap: 6px;">
+            <span>🔗 CONNECT EXTENSION TO AXON</span>
+          </div>
+          <button id="axon-pair-close" style="background: none; border: none; color: #94A3B8; cursor: pointer; font-size: 18px; padding: 2px 6px;">&times;</button>
+        </div>
+
+        <div style="padding: 16px; font-size: 12px;">
+          <!-- Status Banner -->
+          <div style="padding: 10px 12px; border-radius: 8px; margin-bottom: 14px; background: ${isConnected ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; border: 1px solid ${isConnected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-size: 10px; color: ${isConnected ? '#86EFAC' : '#FCA5A5'}; font-weight: 700; text-transform: uppercase;">
+                ${isConnected ? '● Connected & Paired' : '○ Not Paired'}
+              </div>
+              <div style="font-size: 12px; font-weight: 600; color: #FFFFFF; margin-top: 2px;">
+                ${isConnected ? `${workspaceName} (${userName})` : 'Standalone / Local Mode'}
+              </div>
+            </div>
+            ${isConnected ? `
+              <button id="axon-pair-disconnect-btn" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #FCA5A5; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; cursor: pointer;">
+                Disconnect
+              </button>
+            ` : ''}
+          </div>
+
+          <!-- Server URL Input -->
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600; margin-bottom: 4px;">Axon Server URL</label>
+            <input id="axon-pair-server-url" type="text" value="${currentAuth.serverUrl || DEFAULT_SERVER_URL}" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; padding: 7px 8px; font-size: 11px; outline: none;" />
+          </div>
+
+          <!-- Option 1: 1-Click Browser Auth -->
+          <div style="margin-bottom: 14px;">
+            <button id="axon-pair-webauth-btn" style="width: 100%; padding: 9px; border-radius: 6px; background: linear-gradient(135deg, #4F46E5, #6366F1); border: none; color: #FFFFFF; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);">
+              <span>🌐 1-Click Authorize via Axon Web Dashboard</span>
+            </button>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+            <div style="flex: 1; height: 1px; background: rgba(255, 255, 255, 0.1);"></div>
+            <span style="font-size: 10px; color: #64748B; font-weight: 600;">OR USE PIN / TOKEN</span>
+            <div style="flex: 1; height: 1px; background: rgba(255, 255, 255, 0.1);"></div>
+          </div>
+
+          <!-- Option 2: 6-digit Code or Token Input -->
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600; margin-bottom: 4px;">6-Digit Pairing PIN or Session Token</label>
+            <div style="display: flex; gap: 6px;">
+              <input id="axon-pair-code-input" type="text" placeholder="e.g. 849201 or axon_ext_tok_..." style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; padding: 7px 8px; font-size: 11px; outline: none;" />
+              <button id="axon-pair-submit-btn" style="padding: 7px 12px; border-radius: 6px; background: #3B82F6; border: none; color: #FFFFFF; font-weight: 600; font-size: 11px; cursor: pointer;">
+                Pair
+              </button>
+            </div>
+          </div>
+
+          <div id="axon-pair-error" style="display: none; color: #F87171; font-size: 11px; margin-bottom: 10px;"></div>
+          <div id="axon-pair-success" style="display: none; color: #34D399; font-size: 11px; margin-bottom: 10px;"></div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    document.getElementById('axon-pair-close').onclick = () => modal.remove();
+    modal.onclick = (e) => {
+      if (e.target === modal) modal.remove();
+    };
+
+    const serverInput = document.getElementById('axon-pair-server-url');
+    const errDiv = document.getElementById('axon-pair-error');
+    const succDiv = document.getElementById('axon-pair-success');
+
+    const disconnectBtn = document.getElementById('axon-pair-disconnect-btn');
+    if (disconnectBtn) {
+      disconnectBtn.onclick = async () => {
+        await disconnectAxon();
+        modal.remove();
+        openModal();
+      };
+    }
+
+    document.getElementById('axon-pair-webauth-btn').onclick = () => {
+      const sUrl = serverInput.value.trim();
+      startWebAuth(sUrl);
+      succDiv.textContent = 'Opening Axon Web Authorization... Please approve in your browser tab.';
+      succDiv.style.display = 'block';
+      errDiv.style.display = 'none';
+    };
+
+    document.getElementById('axon-pair-submit-btn').onclick = async () => {
+      const code = document.getElementById('axon-pair-code-input').value.trim();
+      const sUrl = serverInput.value.trim();
+      if (!code) {
+        errDiv.textContent = 'Please enter a 6-digit PIN code or token.';
+        errDiv.style.display = 'block';
+        return;
+      }
+      errDiv.style.display = 'none';
+      succDiv.style.display = 'none';
+
+      const res = await pairWithCode(code, sUrl);
+      if (res.ok) {
+        succDiv.textContent = `Connected successfully to ${res.workspace?.name || 'Axon'}!`;
+        succDiv.style.display = 'block';
+        setTimeout(() => modal.remove(), 1200);
+      } else {
+        errDiv.textContent = res.error || 'Failed to pair.';
+        errDiv.style.display = 'block';
+      }
+    };
+  }
+
+  // ==========================================
+  // Git Commit & Push Modal
+  // ==========================================
+  function openGitCommitModal() {
+    const existing = document.getElementById('axon-git-modal');
+    if (existing) existing.remove();
+
+    const activeProject = currentAuth.projects?.find(p => p.id === currentAuth.activeProjectId) || currentAuth.projects?.[0] || { id: 'proj-live', name: 'Current Project' };
+
+    const modal = document.createElement('div');
+    modal.id = 'axon-git-modal';
+    modal.style.cssText = `
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
+      z-index: 20000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
+
+    modal.innerHTML = `
+      <div style="background: #181530; color: #FFFFFF; width: 100%; max-width: 440px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6); overflow: hidden;">
+        <div style="padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-weight: 700; font-size: 13px; color: #34D399; display: flex; align-items: center; gap: 6px;">
+            <span>💾 AXON GIT COMMIT & PUSH PIPELINE</span>
+          </div>
+          <button id="axon-git-close" style="background: none; border: none; color: #94A3B8; cursor: pointer; font-size: 18px; padding: 2px 6px;">&times;</button>
+        </div>
+
+        <div style="padding: 16px; font-size: 12px;">
+          <!-- Target Repo / Project info -->
+          <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+            <div style="flex: 2;">
+              <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600; margin-bottom: 4px;">Project / Repository</label>
+              <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 7px 8px; color: #E2E8F0; font-size: 11px; font-weight: 600;">
+                📁 ${activeProject.name || 'Current Workspace'}
+              </div>
+            </div>
+            <div style="flex: 1;">
+              <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600; margin-bottom: 4px;">Branch</label>
+              <input id="axon-git-branch" type="text" value="main" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; padding: 7px 8px; font-size: 11px; outline: none;" />
+            </div>
+          </div>
+
+          <!-- Commit Message -->
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 10px; text-transform: uppercase; color: #94A3B8; font-weight: 600; margin-bottom: 4px;">Commit Message</label>
+            <input id="axon-git-message" type="text" value="feat(visual): polish layout and styles via Axon Extension" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; padding: 7px 8px; font-size: 11px; outline: none;" />
+          </div>
+
+          <!-- Changes Summary -->
+          <div style="margin-bottom: 14px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #94A3B8; font-weight: 600; margin-bottom: 6px;">
+              <span>STAGED FILES & STYLES OVERRIDES</span>
+              <span style="color: #34D399;">Ready for Git Push</span>
+            </div>
+            <div style="font-family: monospace; font-size: 10px; color: #A7F3D0; line-height: 1.5;">
+              <div>+ src/styles/overrides.css (DOM hotfix rules)</div>
+              <div>+ .axon/patches.json (Session visual state)</div>
+            </div>
+          </div>
+
+          <!-- Live Progress Box (Hidden initially) -->
+          <div id="axon-git-progress" style="display: none; margin-bottom: 12px; background: #0F0D1B; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 8px; font-family: monospace; font-size: 10px; color: #6EE7B7; max-height: 90px; overflow-y: auto;">
+            <div>> Initializing git commit pipeline...</div>
+          </div>
+
+          <div id="axon-git-error" style="display: none; color: #F87171; font-size: 11px; margin-bottom: 10px;"></div>
+
+          <button id="axon-git-submit" style="width: 100%; padding: 10px; border-radius: 6px; background: linear-gradient(135deg, #10B981, #059669); border: none; color: #FFFFFF; font-weight: 700; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);">
+            <span>🚀 Commit and Push to Repository</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    document.getElementById('axon-git-close').onclick = () => modal.remove();
+    modal.onclick = (e) => {
+      if (e.target === modal) modal.remove();
+    };
+
+    const submitBtn = document.getElementById('axon-git-submit');
+    const progressBox = document.getElementById('axon-git-progress');
+    const errDiv = document.getElementById('axon-git-error');
+
+    submitBtn.onclick = async () => {
+      const branch = document.getElementById('axon-git-branch').value.trim() || 'main';
+      const msg = document.getElementById('axon-git-message').value.trim() || 'feat(visual): style tweaks via Axon Extension';
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="axon-ai-spin">⚡</span> Pushing to remote repository...';
+      progressBox.style.display = 'block';
+      errDiv.style.display = 'none';
+
+      progressBox.innerHTML = `
+        <div>> Staging visual DOM CSS overrides...</div>
+        <div>> Creating Git tree object on branch '${branch}'...</div>
+      `;
+
+      try {
+        const res = await executeGitCommitPipeline(msg, branch);
+        progressBox.innerHTML += `
+          <div>> Commit ${res.commitSha ? res.commitSha.slice(0, 7) : 'created'}: "${msg}"</div>
+          <div>> Push to origin/${branch} successful!</div>
+        `;
+        showToast('🎉 Git Commit & Push completed successfully!');
+        setTimeout(() => modal.remove(), 1500);
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>🚀 Commit and Push to Repository</span>';
+        progressBox.innerHTML += `<div style="color: #F87171;">> Pipeline note: ${err.message}</div>`;
+        errDiv.textContent = err.message;
+        errDiv.style.display = 'block';
+      }
+    };
+  }
+
   function injectUI() {
     if (document.getElementById('axon-topbar')) return;
 
@@ -866,14 +1129,14 @@ Return ONLY a valid JSON object with format:
     bar.innerHTML = `
       <!-- Left: Logo & Status -->
       <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
-        <div style="display: flex; align-items: center; gap: 4px; font-weight: 800; letter-spacing: -0.3px; color: #818CF8; font-size: 12px;">
+        <div style="display: flex; align-items: center; gap: 4px; font-weight: 800; letter-spacing: -0.3px; color: #818CF8; font-size: 12px; cursor: pointer;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
           </svg>
           <span style="color: #FFFFFF;">AXON</span>
         </div>
         
-        <div id="axon-status-indicator" title="Click to view pairing details" style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.08); transition: background 0.15s ease;">
+        <div id="axon-status-indicator" title="Click to view connection & pairing details" style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.08); transition: background 0.15s ease;">
           <span id="axon-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #94A3B8;"></span>
           <span id="axon-status-text" style="font-size: 10px; color: #CBD5E1; font-weight: 500;">Offline</span>
         </div>
@@ -882,7 +1145,7 @@ Return ONLY a valid JSON object with format:
       <!-- Right: Action Buttons & Controls -->
       <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
         <!-- Teammates Presence Stack -->
-        <div id="axon-presence-stack" title="Active Teammates" style="display: flex; align-items: center; cursor: pointer; margin-right: 2px;"></div>
+        <div id="axon-presence-stack" title="Active Teammates (Click for details)" style="display: flex; align-items: center; cursor: pointer; margin-right: 2px;"></div>
 
         <!-- Project Selector -->
         <select id="axon-project-select" style="
@@ -911,13 +1174,15 @@ Return ONLY a valid JSON object with format:
           cursor: pointer;
           align-items: center;
           gap: 3px;
+          user-select: none;
+          transition: background 0.15s ease, transform 0.1s ease;
         ">
           <span>✨ AI</span>
         </button>
 
         <!-- Activities History Button -->
         <button id="axon-activity-btn" title="Team Activity & Audit History" style="
-          display: none;
+          display: inline-flex;
           background: rgba(255, 255, 255, 0.08);
           border: 1px solid rgba(255, 255, 255, 0.15);
           color: #E2E8F0;
@@ -928,13 +1193,15 @@ Return ONLY a valid JSON object with format:
           cursor: pointer;
           align-items: center;
           gap: 3px;
+          user-select: none;
+          transition: background 0.15s ease, transform 0.1s ease;
         ">
           <span>📜 History</span>
         </button>
 
         <!-- Save & Git Push Button (REAL PIPELINE) -->
         <button id="axon-git-commit-btn" title="Commit and Push changes via Git" style="
-          display: none;
+          display: inline-flex;
           background: linear-gradient(135deg, #10B981, #059669);
           color: white;
           border: none;
@@ -946,13 +1213,15 @@ Return ONLY a valid JSON object with format:
           align-items: center;
           gap: 4px;
           box-shadow: 0 1px 4px rgba(16, 185, 129, 0.3);
+          user-select: none;
+          transition: filter 0.15s ease, transform 0.1s ease;
         ">
           <span>💾 Git Push</span>
         </button>
 
         <!-- Publish Patch Button -->
-        <button id="axon-publish-btn" style="
-          display: none;
+        <button id="axon-publish-btn" title="Stage and Publish Hotfix Patch" style="
+          display: inline-flex;
           background: rgba(99, 102, 241, 0.2);
           border: 1px solid rgba(99, 102, 241, 0.4);
           color: #A5B4FC;
@@ -961,12 +1230,15 @@ Return ONLY a valid JSON object with format:
           font-size: 10px;
           font-weight: 600;
           cursor: pointer;
+          user-select: none;
+          transition: background 0.15s ease, transform 0.1s ease;
         ">
           <span>🚀 Patch</span>
         </button>
 
         <!-- Connect / Pair Button -->
         <button id="axon-connect-btn" style="
+          display: inline-flex;
           background: #4F46E5;
           color: white;
           border: none;
@@ -975,6 +1247,7 @@ Return ONLY a valid JSON object with format:
           font-size: 10px;
           font-weight: 600;
           cursor: pointer;
+          user-select: none;
         ">
           Pair with Axon
         </button>
@@ -983,20 +1256,88 @@ Return ONLY a valid JSON object with format:
 
     document.body.prepend(bar);
 
-    // Event listeners
-    document.getElementById('axon-status-indicator').onclick = openModal;
-    document.getElementById('axon-connect-btn').onclick = openModal;
-    document.getElementById('axon-publish-btn').onclick = openPublishModal;
-    document.getElementById('axon-git-commit-btn').onclick = openGitCommitModal;
-    document.getElementById('axon-ai-btn').onclick = openInlineAiModal;
-    document.getElementById('axon-activity-btn').onclick = openActivityModal;
-    document.getElementById('axon-presence-stack').onclick = openTeammatesModal;
+    // Event Delegation: Guarantees 100% clickability across all buttons and child elements
+    bar.addEventListener('click', (e) => {
+      const aiBtn = e.target.closest('#axon-ai-btn');
+      if (aiBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        openInlineAiModal();
+        return;
+      }
+
+      const actBtn = e.target.closest('#axon-activity-btn');
+      if (actBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        openActivityModal();
+        return;
+      }
+
+      const gitBtn = e.target.closest('#axon-git-commit-btn');
+      if (gitBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        openGitCommitModal();
+        return;
+      }
+
+      const pubBtn = e.target.closest('#axon-publish-btn');
+      if (pubBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        openPublishModal();
+        return;
+      }
+
+      const connBtn = e.target.closest('#axon-connect-btn');
+      if (connBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        openModal();
+        return;
+      }
+
+      const statIndicator = e.target.closest('#axon-status-indicator');
+      if (statIndicator) {
+        e.preventDefault();
+        e.stopPropagation();
+        openModal();
+        return;
+      }
+
+      const presStack = e.target.closest('#axon-presence-stack');
+      if (presStack) {
+        e.preventDefault();
+        e.stopPropagation();
+        openTeammatesModal();
+        return;
+      }
+    });
+
+    // Direct listener attachments as backup
+    const aiEl = document.getElementById('axon-ai-btn');
+    if (aiEl) aiEl.onclick = openInlineAiModal;
+    const actEl = document.getElementById('axon-activity-btn');
+    if (actEl) actEl.onclick = openActivityModal;
+    const gitEl = document.getElementById('axon-git-commit-btn');
+    if (gitEl) gitEl.onclick = openGitCommitModal;
+    const pubEl = document.getElementById('axon-publish-btn');
+    if (pubEl) pubEl.onclick = openPublishModal;
+    const connEl = document.getElementById('axon-connect-btn');
+    if (connEl) connEl.onclick = openModal;
+    const statEl = document.getElementById('axon-status-indicator');
+    if (statEl) statEl.onclick = openModal;
+    const presEl = document.getElementById('axon-presence-stack');
+    if (presEl) presEl.onclick = openTeammatesModal;
 
     const projectSelect = document.getElementById('axon-project-select');
-    projectSelect.onchange = (e) => {
-      currentAuth.activeProjectId = e.target.value;
-      saveAuth();
-    };
+    if (projectSelect) {
+      projectSelect.onchange = (e) => {
+        currentAuth.activeProjectId = e.target.value;
+        saveAuth();
+      };
+    }
 
     injectModalStyles();
   }
@@ -1058,26 +1399,36 @@ Return ONLY a valid JSON object with format:
     const publishBtn = document.getElementById('axon-publish-btn');
     const commitBtn = document.getElementById('axon-git-commit-btn');
     const activityBtn = document.getElementById('axon-activity-btn');
+    const aiBtn = document.getElementById('axon-ai-btn');
     const projectSelect = document.getElementById('axon-project-select');
 
     if (!indicator || !dot || !text) return;
+
+    // Ensure all 4 action buttons are ALWAYS visible and clickable
+    if (aiBtn) aiBtn.style.display = 'inline-flex';
+    if (activityBtn) activityBtn.style.display = 'inline-flex';
+    if (commitBtn) commitBtn.style.display = 'inline-flex';
+    if (publishBtn) publishBtn.style.display = 'inline-flex';
 
     if (currentAuth.token) {
       dot.style.background = '#22C55E';
       dot.style.boxShadow = '0 0 6px rgba(34, 197, 94, 0.7)';
       text.textContent = currentAuth.workspace?.name || 'Connected';
       text.style.color = '#86EFAC';
-      connectBtn.style.display = 'none';
-      publishBtn.style.display = 'inline-flex';
-      commitBtn.style.display = 'inline-flex';
-      activityBtn.style.display = 'inline-flex';
+      if (connectBtn) {
+        connectBtn.style.display = 'inline-flex';
+        connectBtn.textContent = 'Settings';
+        connectBtn.style.background = 'rgba(255, 255, 255, 0.12)';
+      }
 
       if (currentAuth.projects && currentAuth.projects.length > 0) {
-        projectSelect.style.display = 'inline-block';
-        projectSelect.innerHTML = currentAuth.projects
-          .map((p) => `<option value="${p.id}" ${p.id === currentAuth.activeProjectId ? 'selected' : ''}>${p.name}</option>`)
-          .join('');
-      } else {
+        if (projectSelect) {
+          projectSelect.style.display = 'inline-block';
+          projectSelect.innerHTML = currentAuth.projects
+            .map((p) => `<option value="${p.id}" ${p.id === currentAuth.activeProjectId ? 'selected' : ''}>${p.name}</option>`)
+            .join('');
+        }
+      } else if (projectSelect) {
         projectSelect.style.display = 'none';
       }
     } else {
@@ -1085,11 +1436,12 @@ Return ONLY a valid JSON object with format:
       dot.style.boxShadow = 'none';
       text.textContent = 'Not Paired';
       text.style.color = '#FCA5A5';
-      connectBtn.style.display = 'inline-flex';
-      publishBtn.style.display = 'none';
-      commitBtn.style.display = 'none';
-      activityBtn.style.display = 'none';
-      projectSelect.style.display = 'none';
+      if (connectBtn) {
+        connectBtn.style.display = 'inline-flex';
+        connectBtn.textContent = 'Pair with Axon';
+        connectBtn.style.background = '#4F46E5';
+      }
+      if (projectSelect) projectSelect.style.display = 'none';
     }
   }
 
